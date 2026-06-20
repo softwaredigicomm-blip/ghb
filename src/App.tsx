@@ -569,9 +569,9 @@ function AppLayout({ user, hospitalInfo, handleLogout, isMobileMenuOpen, setIsMo
             {(user?.role === 'SUPER_ADMIN' || user?.role === 'DOCTOR' || user?.role === 'RECEPTION' || user?.role === 'RECEPTIONIST' || user?.role === 'FRONT_DESK' || user?.role === 'NURSE') && (
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-2 rounded-full px-4 border-medical-blue text-medical-blue hover:bg-medical-blue hover:text-white transition-all">
+                  <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-2 rounded-full px-4 border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition-all">
                     <Plus className="w-4 h-4" />
-                    Quick Register
+                    Emergency
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[600px]">

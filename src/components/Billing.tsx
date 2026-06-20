@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CreditCard, 
@@ -16,7 +16,12 @@ import {
   Edit,
   Loader2,
   User,
-  Coins
+  Coins,
+  TrendingUp,
+  BarChart3,
+  Database,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +42,23 @@ import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MOCK_USERS, MOCK_BILLING, MOCK_BED_RATES, MOCK_OT_RATES, MOCK_LAB_TESTS, MOCK_MATERIAL_RATES } from '@/mockData';
 import { supabaseService } from '@/services/supabaseService';
 import { useDataSync } from '@/hooks/useDataSync';
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  BarChart as ReBarChart, 
+  Bar as ReBar, 
+  Cell as ReCell, 
+  PieChart, 
+  Pie, 
+  Legend, 
+  LineChart, 
+  Line 
+} from 'recharts';
 
 import { 
   Dialog, 
@@ -149,7 +171,308 @@ export default function Billing() {
   };
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'recent' | 'consolidated'>('recent');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'recent' | 'consolidated'>('analytics');
+  const [seeding, setSeeding] = useState(false);
+
+  // Compute analytics dynamically
+  const analyticsData = useMemo(() => {
+    if (!bills || bills.length === 0) {
+      return {
+        totalBilled: 0,
+        totalPaid: 0,
+        totalOutstanding: 0,
+        collectionRate: 0,
+        categoryData: [],
+        methodData: [],
+        trendData: [],
+        statusCounts: { paid: 0, partial: 0, unpaid: 0 }
+      };
+    }
+
+    let grossBilled = 0;
+    let netPaid = 0;
+    let paidCount = 0;
+    let partialCount = 0;
+    let unpaidCount = 0;
+
+    const categoryTotals: Record<string, number> = {};
+    const methodTotals: Record<string, number> = {};
+    const trendMap: Record<string, { date: string, billed: number, collected: number }> = {};
+
+    bills.forEach(b => {
+      if (!b) return;
+      const billedVal = Number(b.payable_amount ?? b.payableAmount ?? b.total_amount ?? b.totalAmount ?? 0);
+      const paidVal = Number(b.paid_amount ?? b.paidAmount ?? 0);
+      
+      grossBilled += billedVal;
+      netPaid += paidVal;
+
+      const s = (b.status || b.payment_status || '').toLowerCase();
+      if (s === 'settled' || s === 'paid') paidCount++;
+      else if (s === 'partial') partialCount++;
+      else unpaidCount++;
+
+      // Department/Category breakdown
+      const type = (b.type || 'General').toUpperCase();
+      categoryTotals[type] = (categoryTotals[type] || 0) + paidVal;
+
+      // Also parse items inside invoice_items to refine categories if available
+      if (b.invoice_items && Array.isArray(b.invoice_items)) {
+        b.invoice_items.forEach((item: any) => {
+          const cat = (item.category || item.item_type || 'General').toUpperCase();
+          const itemAmt = Number(item.total_price || item.amount || 0);
+          // Distribute item amounts proportionally if invoice is partially paid, otherwise use item price
+          const scale = billedVal > 0 ? (paidVal / billedVal) : 1;
+          categoryTotals[cat] = (categoryTotals[cat] || 0) + (itemAmt * scale);
+        });
+      }
+
+      // Payment method breakdown
+      const method = b.payment_method || b.paymentMode || 'N/A';
+      methodTotals[method] = (methodTotals[method] || 0) + paidVal;
+
+      // Trend mapping (by date)
+      const dateStr = (b.created_at || b.date || new Date().toISOString()).split('T')[0];
+      if (!trendMap[dateStr]) {
+        trendMap[dateStr] = { date: formatDate(b.created_at || b.date), billed: 0, collected: 0 };
+      }
+      trendMap[dateStr].billed += billedVal;
+      trendMap[dateStr].collected += paidVal;
+    });
+
+    const outstanding = Math.max(0, grossBilled - netPaid);
+    const colRate = grossBilled > 0 ? (netPaid / grossBilled) * 100 : 0;
+
+    // Map Category Totals with nice labels
+    const catLabels: Record<string, string> = {
+      'OPD': 'OPD Consultation',
+      'IPD': 'IPD/Ward Rooms',
+      'LAB': 'Lab Diagnostics',
+      'PATH': 'Pathology',
+      'RADIO': 'Radiology Services',
+      'PHARMACY': 'Pharmacy POS',
+      'OT': 'Operation Theatre'
+    };
+    const categoryData = Object.entries(categoryTotals).map(([cat, total]) => ({
+      name: catLabels[cat] || cat,
+      value: Math.round(total),
+    })).filter(item => item.value > 0);
+
+    // Map Method Totals
+    const methodColors: Record<string, string> = {
+      'Cash': '#10b981',
+      'UPI': '#0ea5e9',
+      'Card': '#8b5cf6',
+      'Insurance': '#f59e0b',
+      'N/A': '#94a3b8'
+    };
+    const methodData = Object.entries(methodTotals).map(([method, total]) => ({
+      name: method,
+      value: Math.round(total),
+      color: methodColors[method] || '#64748b'
+    })).filter(item => item.value > 0);
+
+    // Sort trend log by actual date key
+    const trendData = Object.entries(trendMap)
+      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+      .map(([_, val]) => val);
+
+    return {
+      totalBilled: grossBilled,
+      totalPaid: netPaid,
+      totalOutstanding: outstanding,
+      collectionRate: colRate,
+      categoryData,
+      methodData,
+      trendData,
+      statusCounts: { paid: paidCount, partial: partialCount, unpaid: unpaidCount }
+    };
+  }, [bills]);
+
+  const handleSeedDemoInvoices = async () => {
+    setSeeding(true);
+    try {
+      let activePatients = [...patients];
+      
+      // If we don't have patients in the DB, let's create a couple of patients first
+      if (activePatients.length === 0) {
+        toast.info('Seeding dynamic mock patients first to link ledger accounts...');
+        const p1 = await supabaseService.createPatient({
+          name: 'Amit Patel',
+          age: 28,
+          gender: 'Male',
+          phone: '9876543210',
+          address: 'B-42, Sector 15, Noida',
+          bloodGroup: 'A+',
+          status: 'Active',
+          dob: '1996-05-15'
+        });
+        const p2 = await supabaseService.createPatient({
+          name: 'Priya Singh',
+          age: 45,
+          gender: 'Female',
+          phone: '9123456789',
+          address: 'Flat 201, Green View, Mumbai',
+          bloodGroup: 'O-',
+          status: 'High Risk',
+          dob: '1979-11-10'
+        });
+        const p3 = await supabaseService.createPatient({
+          name: 'Rahul Sharma',
+          age: 34,
+          gender: 'Male',
+          phone: '9543210987',
+          address: 'Main St, Delhi',
+          bloodGroup: 'B+',
+          status: 'Active',
+          dob: '1990-02-20'
+        });
+        
+        if (p1) activePatients.push(p1);
+        if (p2) activePatients.push(p2);
+        if (p3) activePatients.push(p3);
+      }
+      
+      if (activePatients.length === 0) {
+        throw new Error('Could not create or find active patients for seeding invoices.');
+      }
+      
+      toast.info('Generating comprehensive revenue ledger files in PostgreSQL...');
+      
+      // Generate some realistic invoices spanning the past few weeks
+      const seedInvoices = [
+        {
+          patient_id: activePatients[0].id,
+          type: 'OPD',
+          payment_method: 'Cash',
+          status: 'Settled',
+          payment_status: 'Paid',
+          created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+          discount_amount: 0,
+          tax_amount: 0,
+          total_amount: 500,
+          payable_amount: 500,
+          paid_amount: 500,
+          items: [{ description: 'OPD Consultation Fee - Dr. Rajesh Sharma', amount: 500, category: 'OPD' }]
+        },
+        {
+          patient_id: activePatients[1].id,
+          type: 'IPD',
+          payment_method: 'UPI',
+          status: 'Settled',
+          payment_status: 'Paid',
+          created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          discount_amount: 500,
+          tax_amount: 250,
+          total_amount: 3500,
+          payable_amount: 3000,
+          paid_amount: 3000,
+          items: [{ description: 'General Ward Room Rent (Semi-Private)', amount: 3000, category: 'IPD' }]
+        },
+        {
+          patient_id: activePatients[0].id,
+          type: 'Lab',
+          payment_method: 'Card',
+          status: 'Settled',
+          payment_status: 'Paid',
+          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          discount_amount: 0,
+          tax_amount: 150,
+          total_amount: 2500,
+          payable_amount: 2500,
+          paid_amount: 2500,
+          items: [
+            { description: 'Complete Blood Count (CBC) with Hematology', amount: 1000, category: 'Lab' },
+            { description: 'Liver Function Test (LFT) & Lipid Profile', amount: 1500, category: 'Lab' }
+          ]
+        },
+        {
+          patient_id: activePatients[2 % activePatients.length].id,
+          type: 'Pharmacy',
+          payment_method: 'Cash',
+          status: 'Settled',
+          payment_status: 'Paid',
+          created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+          discount_amount: 100,
+          tax_amount: 80,
+          total_amount: 1200,
+          payable_amount: 1100,
+          paid_amount: 1100,
+          items: [
+            { description: 'Amoxicillin 250mg Tablets (Batch A-10)', amount: 500, category: 'Pharmacy' },
+            { description: 'Paracetamol 500mg (Batch P-99)', amount: 600, category: 'Pharmacy' }
+          ]
+        },
+        {
+          patient_id: activePatients[1].id,
+          type: 'IPD',
+          payment_method: 'UPI',
+          status: 'Partial',
+          payment_status: 'Partial',
+          created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+          discount_amount: 2000,
+          tax_amount: 2500,
+          total_amount: 50000,
+          payable_amount: 48000,
+          paid_amount: 20000,
+          items: [{ description: 'Cardiology Surgery - Main Theatre Charge', amount: 48000, category: 'IPD' }]
+        },
+        {
+          patient_id: activePatients[0].id,
+          type: 'Radiology',
+          payment_method: 'UPI',
+          status: 'Settled',
+          payment_status: 'Paid',
+          created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          discount_amount: 0,
+          tax_amount: 180,
+          total_amount: 1800,
+          payable_amount: 1800,
+          paid_amount: 1800,
+          items: [{ description: 'X-Ray Chest PA View & Interpretation', amount: 1800, category: 'Radio' }]
+        },
+        {
+          patient_id: activePatients[1].id,
+          type: 'OPD',
+          payment_method: 'Cash',
+          status: 'Settled',
+          payment_status: 'Paid',
+          created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          discount_amount: 0,
+          tax_amount: 0,
+          total_amount: 300,
+          payable_amount: 300,
+          paid_amount: 300,
+          items: [{ description: 'OPD Follow-up - General Medicine', amount: 300, category: 'OPD' }]
+        }
+      ];
+      
+      for (const item of seedInvoices) {
+        await supabaseService.createInvoice({
+          patient_id: item.patient_id,
+          type: item.type,
+          payment_method: item.payment_method,
+          status: item.status,
+          payment_status: item.payment_status,
+          discount_amount: item.discount_amount,
+          tax_amount: item.tax_amount,
+          total_amount: item.total_amount,
+          payable_amount: item.payable_amount,
+          paid_amount: item.paid_amount,
+          created_at: item.created_at
+        }, item.items);
+      }
+      
+      toast.success('Successfully provisioned realistic clinical ledgers in live database!');
+      await fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Failed to seed DB: ' + err.message);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const [conPatientId, setConPatientId] = useState<string>('');
   const [conPatientSearch, setConPatientSearch] = useState<string>('');
   const [showConPatientResults, setShowConPatientResults] = useState<boolean>(false);
@@ -1909,7 +2232,17 @@ export default function Billing() {
         </Card>
       </div>
 
-      <div className="flex border-b border-slate-200 mt-6 select-none bg-white p-1 rounded-t-xl">
+      <div className="flex flex-wrap border-b border-slate-200 mt-6 select-none bg-white p-1 rounded-t-xl gap-1">
+        <button
+          className={`px-6 py-2.5 text-xs font-bold border-b-2 transition-all ${
+            activeTab === 'analytics' 
+              ? 'border-medical-blue text-medical-blue font-black bg-blue-50/40 rounded-t-lg' 
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+          onClick={() => setActiveTab('analytics')}
+        >
+          📊 Accounts Overview & Charts
+        </button>
         <button
           className={`px-6 py-2.5 text-xs font-bold border-b-2 transition-all ${
             activeTab === 'recent' 
@@ -1931,6 +2264,295 @@ export default function Billing() {
           Patient Consolidated Ledger (Date-wise)
         </button>
       </div>
+
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          {bills.length === 0 ? (
+            <div className="bg-white border border-slate-100 rounded-3xl p-10 text-center shadow-lg hover:shadow-xl transition-shadow max-w-2xl mx-auto my-12 animate-in fade-in duration-300">
+              <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 mx-auto mb-5">
+                <Sparkles className="w-8 h-8 animate-pulse" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">Dynamic Accounts Ledger Empty</h3>
+              <p className="text-sm text-slate-500 mt-3 max-w-md mx-auto leading-relaxed">
+                Connect and sync interactive ledger records to monitor live collections, outstanding accounts and analyze transaction structures.
+              </p>
+              <div className="mt-8 flex justify-center gap-3">
+                <Button 
+                  className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold gap-2 px-6 shadow-md shadow-teal-50"
+                  onClick={handleSeedDemoInvoices}
+                  disabled={seeding}
+                >
+                  {seeding ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating Ledgers...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4" />
+                      Auto-Seed Demo Billing
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="rounded-xl font-bold" 
+                  onClick={() => setIsInvoiceOpen(true)}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Manual Invoice
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              {/* Top Analytical KPIs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="border-none shadow-sm bg-gradient-to-tr from-slate-50 to-slate-100/50">
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Gross Invoiced</p>
+                      <h4 className="text-xl font-bold text-slate-800 mt-1">{formatCurrency(analyticsData.totalBilled)}</h4>
+                      <p className="text-[9px] text-slate-400 mt-1">Sum of all generated charges</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+                      <Coins className="w-5 h-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-gradient-to-tr from-emerald-50/50 to-emerald-100/30">
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Payments Collected</p>
+                      <h4 className="text-xl font-bold text-emerald-700 mt-1">{formatCurrency(analyticsData.totalPaid)}</h4>
+                      <p className="text-[9px] text-emerald-600/70 mt-1">Realized liquid hospital cash</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-gradient-to-tr from-amber-50/50 to-amber-100/30">
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Outstanding Dues</p>
+                      <h4 className="text-xl font-bold text-amber-600 mt-1">{formatCurrency(analyticsData.totalOutstanding)}</h4>
+                      <p className="text-[9px] text-amber-600/70 mt-1">Unreleased patient accounts</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-gradient-to-tr from-blue-50/50 to-blue-100/30">
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-blue-700 font-bold uppercase tracking-wider">Realization Rate</p>
+                      <h4 className="text-xl font-bold text-blue-700 mt-1">{analyticsData.collectionRate.toFixed(1)}%</h4>
+                      <p className="text-[9px] text-blue-600/70 mt-1">Collection conversion ratio</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                      <TrendingUp className="w-5 h-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Analytical Charts Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Monthly Revenue Trend Area Chart */}
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <BarChart3 className="w-4 h-4 text-medical-blue" />
+                        Daily Collections Trend
+                      </CardTitle>
+                      <CardDescription className="text-xs">Real-time ledger entries tracking cash flow</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-[280px]">
+                    {analyticsData.trendData.length > 0 ? (
+                      <div className="w-full h-full min-h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={analyticsData.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="colorBilled" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#1e40af" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#1e40af" stopOpacity={0}/>
+                              </linearGradient>
+                              <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <Tooltip 
+                              formatter={(value: number) => [`₹${value.toLocaleString()}`, '']}
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,0.06)', fontFamily: 'Inter, sans-serif' }}
+                            />
+                            <Area name="Total Billed" type="monotone" dataKey="billed" stroke="#1e40af" strokeWidth={2} fillOpacity={1} fill="url(#colorBilled)" />
+                            <Area name="Collections" type="monotone" dataKey="collected" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorCollected)" />
+                            <Legend wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+                        Insufficient invoice histories to plot visual graphs
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Departmental Revenue Distribution */}
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <Coins className="w-4 h-4 text-emerald-600" />
+                        Collection Share by Department
+                      </CardTitle>
+                      <CardDescription className="text-xs">Proportion of gross realized revenue</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-[280px]">
+                    {analyticsData.categoryData.length > 0 ? (
+                      <div className="w-full h-full min-h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ReBarChart data={analyticsData.categoryData} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                            <XAxis type="number" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <YAxis dataKey="name" type="category" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={100} />
+                            <Tooltip 
+                              formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Revenue Share']}
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,0.06)' }}
+                            />
+                            <ReBar dataKey="value" fill="#0ea5e9" radius={[0, 4, 4, 0]} barSize={16}>
+                              {analyticsData.categoryData.map((entry, index) => (
+                                <ReCell key={`cell-${index}`} fill={['#0e2954', '#10b981', '#8b5cf6', '#eab308', '#ec4899', '#f97316'][index % 6]} />
+                              ))}
+                            </ReBar>
+                          </ReBarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+                        No categorical listings processed yet
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Payment Method Distribution */}
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <CreditCard className="w-4 h-4 text-purple-600" />
+                        Transactions by Payment Mode
+                      </CardTitle>
+                      <CardDescription className="text-xs">Realized transactional totals grouped by channel</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-[280px]">
+                    {analyticsData.methodData.length > 0 ? (
+                      <div className="w-full h-full min-h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ReBarChart data={analyticsData.methodData} margin={{ top: 15, right: 10, left: -20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <Tooltip 
+                              formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Total Collected']}
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,0.06)' }}
+                            />
+                            <ReBar dataKey="value" radius={[4, 4, 0, 0]} barSize={26}>
+                              {analyticsData.methodData.map((entry: any, index: number) => (
+                                <ReCell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </ReBar>
+                          </ReBarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+                        No payments recorded for distribution analysis
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Revenue Health Ledger Audit */}
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      Invoice Portfolio Health
+                    </CardTitle>
+                    <CardDescription className="text-xs">Classification of existing patient ledger entries</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-50 bg-slate-50/50">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                          <span className="text-xs font-semibold text-slate-700">Fully Settled Invoices</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-black text-slate-800">{analyticsData.statusCounts.paid}</span>
+                          <span className="text-[10px] text-muted-foreground ml-1.5 uppercase font-bold tracking-tight">Records</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-50 bg-slate-50/50">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                          <span className="text-xs font-semibold text-slate-700">Partially Paid Invoices</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-black text-slate-800">{analyticsData.statusCounts.partial}</span>
+                          <span className="text-[10px] text-muted-foreground ml-1.5 uppercase font-bold tracking-tight">Records</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-2xl border border-slate-50 bg-slate-50/50">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                          <span className="text-xs font-semibold text-slate-700">Pending Dues & Drafts</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-black text-slate-800">{analyticsData.statusCounts.unpaid}</span>
+                          <span className="text-[10px] text-muted-foreground ml-1.5 uppercase font-bold tracking-tight">Records</span>
+                        </div>
+                      </div>
+
+                      <div className="text-center pt-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs text-medical-blue hover:text-medical-blue/80 hover:bg-transparent font-bold h-7 gap-1"
+                          onClick={() => setActiveTab('recent')}
+                        >
+                          Access Core Posting Ledger
+                          <ArrowUpRight className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === 'recent' ? (
         <Card className="border-none shadow-sm rounded-t-none">
