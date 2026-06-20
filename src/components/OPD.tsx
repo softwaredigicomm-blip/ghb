@@ -1001,30 +1001,54 @@ export default function OPD() {
           const patientId = apt.patientId || apt.patient_id;
           if (patientId) {
             const invoices = await supabaseService.getInvoices();
-            if (invoices && invoices.length > 0) {
-              const pendingOPDInvoices = invoices.filter((inv: any) => {
-                const isMatchPatient = (inv.patient_id === patientId || inv.patientId === patientId);
-                const isUnpaid = (inv.status || inv.payment_status || '').toLowerCase() === 'unpaid';
-                const isOPD = inv.type === 'OPD' || 
-                              inv.invoice_number?.startsWith('INV-REG') || 
-                              inv.invoice_number?.startsWith('INV-OPD') ||
-                              inv.invoice_number?.includes('REG') ||
-                              inv.invoice_number?.includes('OPD');
-                return isMatchPatient && isUnpaid && isOPD;
-              });
+            const pendingOPDInvoices = invoices && invoices.length > 0 ? invoices.filter((inv: any) => {
+              const isMatchPatient = (inv.patient_id === patientId || inv.patientId === patientId);
+              const isUnpaid = (inv.status || inv.payment_status || '').toLowerCase() === 'unpaid';
+              const isOPD = inv.type === 'OPD' || 
+                            inv.invoice_number?.startsWith('INV-REG') || 
+                            inv.invoice_number?.startsWith('INV-OPD') ||
+                            inv.invoice_number?.includes('REG') ||
+                            inv.invoice_number?.includes('OPD');
+              return isMatchPatient && isUnpaid && isOPD;
+            }) : [];
 
+            if (pendingOPDInvoices.length > 0) {
               for (const inv of pendingOPDInvoices) {
+                const totalToPay = Number(inv.payable_amount ?? inv.total_amount ?? 0);
                 await supabaseService.updateInvoice(
                   inv.id, 
-                  { ...inv, status: 'Paid', payment_status: 'Paid', paid_amount: inv.total_amount }, 
-                  inv.invoice_items || []
+                  { ...inv, status: 'Paid', payment_status: 'Paid', paid_amount: totalToPay }
                 );
               }
-              window.dispatchEvent(new Event('storage'));
-              window.dispatchEvent(new CustomEvent('supabase-data-sync', { 
-                detail: { table: 'invoices', action: 'update' } 
-              }));
+            } else {
+              // Creating a Paid OPD Consultation Invoice as backup fallback so it immediately appears in Billing logs
+              const feeToCollect = Number(apt.fee || appointmentFee || 500);
+              const invoiceData = {
+                patient_id: patientId,
+                invoice_number: `INV-OPD-${Date.now()}`,
+                status: 'Paid',
+                payment_status: 'Paid',
+                total_amount: feeToCollect,
+                payable_amount: feeToCollect,
+                paid_amount: feeToCollect,
+                payment_method: 'Cash',
+                type: 'OPD',
+                created_by: currentUser?.id
+              };
+              const invoiceItems = [{
+                item_name: `Consultation Fee - ${apt.doctor || apt.doctorName || 'Doctor'}`,
+                category: 'Consultation',
+                quantity: 1,
+                unit_price: feeToCollect,
+                total_price: feeToCollect
+              }];
+              await supabaseService.createInvoice(invoiceData, invoiceItems);
             }
+
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new CustomEvent('supabase-data-sync', { 
+              detail: { table: 'invoices', action: 'update' } 
+            }));
           }
         }
       } catch (err) {

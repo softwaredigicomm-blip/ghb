@@ -144,7 +144,15 @@ export default function PatientOverview({ userRole }: { userRole?: string }) {
     setIsLoading(false);
   };
 
-  useDataSync(fetchInitialData);
+  // Safe compound fetcher for reactive sync events
+  const handleSyncFetch = async () => {
+    await fetchInitialData();
+    if (patientIdFromUrl) {
+      await fetchPatientDetails(patientIdFromUrl);
+    }
+  };
+
+  useDataSync(handleSyncFetch);
 
   useEffect(() => {
     if (patientIdFromUrl) {

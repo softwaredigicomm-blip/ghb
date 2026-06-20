@@ -1115,7 +1115,7 @@ const rawSupabaseService = {
     }
   },
 
-  updateInvoice: async (id: string, invoice: any, items: any[]) => {
+  updateInvoice: async (id: string, invoice: any, items?: any[]) => {
     try {
       const dbInv = cleanInvoiceForPostgres(invoice);
       delete dbInv.invoice_items;
@@ -1129,24 +1129,30 @@ const rawSupabaseService = {
       
       if (invError) throw invError;
       
-      const { error: deleteError } = await supabase
-        .from('invoice_items')
-        .delete()
-        .eq('invoice_id', id);
-        
-      if (deleteError) throw deleteError;
-
-      if (items && items.length > 0) {
-        const itemsToInsert = items.map(item => {
-          const dbItem = cleanInvoiceItemForPostgres(item);
-          return { ...dbItem, invoice_id: id };
-        });
-        
-        const { error: itemsError } = await supabase
+      if (items !== undefined) {
+        const { error: deleteError } = await supabase
           .from('invoice_items')
-          .insert(itemsToInsert);
-        
-        if (itemsError) throw itemsError;
+          .delete()
+          .eq('invoice_id', id);
+          
+        if (deleteError) throw deleteError;
+
+        if (items && items.length > 0) {
+          const itemsToInsert = items.map(item => {
+            const dbItem = cleanInvoiceItemForPostgres(item);
+            return { ...dbItem, invoice_id: id };
+          });
+          
+          const { error: itemsError } = await supabase
+            .from('invoice_items')
+            .insert(itemsToInsert);
+          
+          if (itemsError) throw itemsError;
+        }
+      }
+      
+      if (!invData || invData.length === 0) {
+        throw new Error("No invoice found with the given ID");
       }
       
       const syncedInv = mapInvoiceFromPostgres(invData[0]);
