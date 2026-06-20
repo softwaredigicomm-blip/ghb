@@ -1728,22 +1728,40 @@ const rawSupabaseService = {
   // Staff / Profiles
   decodeStaffPassword: (staffMember: any) => {
     if (!staffMember) return staffMember;
-    const match = staffMember.degree?.match(/\[pwd:(.*?)\]/);
+    const item = { ...staffMember };
+    const match = item.degree?.match(/\[pwd:(.*?)\]/);
     if (match) {
-      staffMember.password = match[1];
-      staffMember.degree = staffMember.degree.replace(/\[pwd:(.*?)\]/, '').trim();
+      item.password = match[1];
+      item.degree = item.degree.replace(/\[pwd:(.*?)\]/, '').trim();
     }
-    return staffMember;
+    const feeMatch = item.degree?.match(/\[fee:(.*?)\]/);
+    if (feeMatch) {
+      item.consultationFee = Number(feeMatch[1]) || 0;
+      item.degree = item.degree.replace(/\[fee:(.*?)\]/, '').trim();
+    } else if (item.consultation_fee !== undefined) {
+      item.consultationFee = Number(item.consultation_fee) || 0;
+    }
+    return item;
   },
 
   encodeStaffPassword: (staffMember: any) => {
     if (!staffMember) return staffMember;
     const dbStaff = { ...staffMember };
+    let cleanDegree = (dbStaff.degree || '').replace(/\[pwd:(.*?)\]/, '').replace(/\[fee:(.*?)\]/, '').trim();
+    
     if (dbStaff.password) {
-      const cleanDegree = (dbStaff.degree || '').replace(/\[pwd:(.*?)\]/, '').trim();
-      dbStaff.degree = `${cleanDegree} [pwd:${dbStaff.password}]`.trim();
-      delete dbStaff.password;
+      cleanDegree = `${cleanDegree} [pwd:${dbStaff.password}]`.trim();
     }
+    
+    const feeValue = dbStaff.consultationFee !== undefined ? dbStaff.consultationFee : dbStaff.consultation_fee;
+    if (feeValue !== undefined && feeValue !== null) {
+      cleanDegree = `${cleanDegree} [fee:${feeValue}]`.trim();
+      dbStaff.consultation_fee = Number(feeValue);
+    }
+    
+    dbStaff.degree = cleanDegree;
+    delete dbStaff.password;
+    delete dbStaff.consultationFee;
     return dbStaff;
   },
 
@@ -1765,6 +1783,14 @@ const rawSupabaseService = {
           if (match) {
             item.password = match[1];
             item.degree = item.degree.replace(/\[pwd:(.*?)\]/, '').trim();
+          }
+          // Decode consultation fee
+          const feeMatch = item.degree?.match(/\[fee:(.*?)\]/);
+          if (feeMatch) {
+            item.consultationFee = Number(feeMatch[1]) || 0;
+            item.degree = item.degree.replace(/\[fee:(.*?)\]/, '').trim();
+          } else if (item.consultation_fee !== undefined) {
+            item.consultationFee = Number(item.consultation_fee) || 0;
           }
           return item;
         });

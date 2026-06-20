@@ -2,7 +2,7 @@
 -- Compatible with PostgreSQL / Supabase
 
 -- Profiles Table
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     role TEXT NOT NULL,
@@ -11,11 +11,12 @@ CREATE TABLE profiles (
     department TEXT,
     specialized_in TEXT,
     avatar_url TEXT,
+    consultation_fee DECIMAL(10,2) DEFAULT 0.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Patients Table
-CREATE TABLE patients (
+CREATE TABLE IF NOT EXISTS patients (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     mrn TEXT UNIQUE NOT NULL,
@@ -30,7 +31,7 @@ CREATE TABLE patients (
 );
 
 -- Appointments Table
-CREATE TABLE appointments (
+CREATE TABLE IF NOT EXISTS appointments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -43,7 +44,7 @@ CREATE TABLE appointments (
 );
 
 -- Invoices Table
-CREATE TABLE invoices (
+CREATE TABLE IF NOT EXISTS invoices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     invoice_number TEXT UNIQUE,
@@ -59,7 +60,7 @@ CREATE TABLE invoices (
 );
 
 -- Invoice Items Table
-CREATE TABLE invoice_items (
+CREATE TABLE IF NOT EXISTS invoice_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
     item_name TEXT NOT NULL,
@@ -71,7 +72,7 @@ CREATE TABLE invoice_items (
 );
 
 -- Pharmacy Inventory Table
-CREATE TABLE pharmacy_items (
+CREATE TABLE IF NOT EXISTS pharmacy_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     category TEXT DEFAULT 'Medicine', -- Medicine, Surgical, Consumable
@@ -90,7 +91,7 @@ CREATE TABLE pharmacy_items (
 );
 
 -- Lab Tests Master Table
-CREATE TABLE lab_tests (
+CREATE TABLE IF NOT EXISTS lab_tests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     category TEXT, -- Pathology, Radiology
@@ -102,7 +103,7 @@ CREATE TABLE lab_tests (
 );
 
 -- Pathology Test Requests Table
-CREATE TABLE test_requests (
+CREATE TABLE IF NOT EXISTS test_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     test_name TEXT NOT NULL,
@@ -117,7 +118,7 @@ CREATE TABLE test_requests (
 );
 
 -- Radiology Records Table
-CREATE TABLE radiology_records (
+CREATE TABLE IF NOT EXISTS radiology_records (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     test_name TEXT NOT NULL,
@@ -131,7 +132,7 @@ CREATE TABLE radiology_records (
 );
 
 -- Beds Table
-CREATE TABLE beds (
+CREATE TABLE IF NOT EXISTS beds (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     bed_number TEXT NOT NULL,
     ward TEXT NOT NULL,
@@ -142,7 +143,7 @@ CREATE TABLE beds (
 );
 
 -- Admissions Table
-CREATE TABLE admissions (
+CREATE TABLE IF NOT EXISTS admissions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     bed_id UUID REFERENCES beds(id),
@@ -154,7 +155,7 @@ CREATE TABLE admissions (
 );
 
 -- Vitals Table
-CREATE TABLE patient_vitals (
+CREATE TABLE IF NOT EXISTS patient_vitals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     temp DECIMAL(4,2),
@@ -166,7 +167,7 @@ CREATE TABLE patient_vitals (
 );
 
 -- Clinical & Nursing Notes Table
-CREATE TABLE clinical_notes (
+CREATE TABLE IF NOT EXISTS clinical_notes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     note_type TEXT, -- Doctor's Note, Nursing Note, Progress Note
@@ -176,7 +177,7 @@ CREATE TABLE clinical_notes (
 );
 
 -- Operation Theatre Schedules
-CREATE TABLE ot_schedules (
+CREATE TABLE IF NOT EXISTS ot_schedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     operation_name TEXT,
@@ -199,7 +200,7 @@ CREATE TABLE ot_schedules (
 );
 
 -- Maternity Delivery Records
-CREATE TABLE maternity_deliveries (
+CREATE TABLE IF NOT EXISTS maternity_deliveries (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     delivery_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -212,7 +213,7 @@ CREATE TABLE maternity_deliveries (
 );
 
 -- Insurance Claims Table
-CREATE TABLE insurance_claims (
+CREATE TABLE IF NOT EXISTS insurance_claims (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
     insurance_provider TEXT NOT NULL,
@@ -223,7 +224,7 @@ CREATE TABLE insurance_claims (
 );
 
 -- Expenses Table
-CREATE TABLE expenses (
+CREATE TABLE IF NOT EXISTS expenses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     category TEXT NOT NULL,
     description TEXT,

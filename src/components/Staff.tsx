@@ -57,7 +57,7 @@ export default function Staff() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any>(null);
-  const [newStaff, setNewStaff] = useState({ name: '', role: 'doctor', department: '', email: '', phone: '', specialty: '' });
+  const [newStaff, setNewStaff] = useState({ name: '', role: 'doctor', department: '', email: '', phone: '', specialty: '', consultationFee: '' });
 
   const fetchData = async () => {
     setLoading(true);
@@ -79,6 +79,7 @@ export default function Staff() {
       role: newStaff.role.toUpperCase().replace(' ', '_'),
       department: newStaff.department,
       specialization: newStaff.specialty,
+      consultationFee: newStaff.role === 'doctor' && newStaff.consultationFee ? Number(newStaff.consultationFee) : 0,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newStaff.name}`
     };
 
@@ -86,7 +87,7 @@ export default function Staff() {
     if (result) {
       toast.success('New staff member added');
       setIsAddOpen(false);
-      setNewStaff({ name: '', role: 'doctor', department: '', email: '', phone: '', specialty: '' });
+      setNewStaff({ name: '', role: 'doctor', department: '', email: '', phone: '', specialty: '', consultationFee: '' });
       fetchData();
     } else {
       toast.error('Failed to add staff member');
@@ -104,6 +105,7 @@ export default function Staff() {
       role: editingStaff.role.toUpperCase().replace(' ', '_'),
       department: editingStaff.department,
       specialization: editingStaff.specialty,
+      consultationFee: editingStaff.role === 'doctor' && editingStaff.consultationFee ? Number(editingStaff.consultationFee) : 0,
       avatar: editingStaff.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${editingStaff.name}`
     };
 
@@ -119,6 +121,11 @@ export default function Staff() {
   };
 
   const handleDeleteStaff = async (id: string) => {
+    const roleUpper = (currentUser?.role || '').toUpperCase();
+    if (roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') {
+      toast.error('Deletion of staff members is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const member = staff.find(s => s.id === id);
     if (member && !canUserModifyRecord(member, currentUser, staff)) {
       toast.error("Access Denied: This staff profile was created by an Admin and cannot be deleted by non-admin users.");
@@ -257,6 +264,17 @@ export default function Staff() {
                       onChange={(e) => setNewStaff({...newStaff, email: e.target.value})}
                     />
                   </div>
+                  {newStaff.role === 'doctor' && (
+                    <div className="space-y-2">
+                      <Label>Consultation Fee (₹)</Label>
+                      <Input 
+                        type="number" 
+                        placeholder="e.g. 500" 
+                        value={newStaff.consultationFee}
+                        onChange={(e) => setNewStaff({...newStaff, consultationFee: e.target.value})}
+                      />
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
@@ -349,6 +367,11 @@ export default function Staff() {
                           {user.role.replace('_', ' ')}
                         </Badge>
                         <span className="text-xs text-muted-foreground">{user.department || 'Administration'}</span>
+                        {(user.role?.toUpperCase().includes('DOCTOR') || user.role?.toUpperCase().includes('SURGEON')) && (
+                          <span className="text-[11px] font-semibold text-emerald-600 mt-0.5">
+                            Consultation: ₹{user.consultationFee || 0}
+                          </span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -383,7 +406,8 @@ export default function Staff() {
                               setEditingStaff({
                                 ...user,
                                 role: user.role.toLowerCase(), // Lowercase for select items
-                                specialty: user.specialization || ''
+                                specialty: user.specialization || '',
+                                consultationFee: user.consultationFee !== undefined ? user.consultationFee : ''
                               });
                               setIsEditOpen(true);
                             }}
@@ -475,6 +499,17 @@ export default function Staff() {
                 onChange={(e) => setEditingStaff({...editingStaff, email: e.target.value})}
               />
             </div>
+            {editingStaff?.role === 'doctor' && (
+              <div className="space-y-2 col-span-2">
+                <Label>Consultation Fee (₹)</Label>
+                <Input 
+                  type="number" 
+                  placeholder="e.g. 500" 
+                  value={editingStaff?.consultationFee || ''}
+                  onChange={(e) => setEditingStaff({...editingStaff, consultationFee: e.target.value})}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>

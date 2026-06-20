@@ -2,10 +2,12 @@
 -- Run this in your Supabase SQL Editor
 --
 -- === MIGRATION/UPDATE FOR INSTALLED DATABASES ===
--- If you already ran this schema previously, please execute the following statements to update patients and invoices tables:
+-- If you already ran this schema previously, please execute the following statements to update patients, invoices, profiles and staff tables:
 -- ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS attending_doctor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
 -- ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS payment_reference TEXT;
 -- ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS payment_remarks TEXT;
+-- ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS consultation_fee DECIMAL(10, 2) DEFAULT 0.00;
+-- ALTER TABLE public.staff ADD COLUMN IF NOT EXISTS consultation_fee DECIMAL(10, 2) DEFAULT 0.00;
 -- ===============================================
 
 -- 1. Profiles / Users (Optional reference to auth.users handled manually without FK block constraint)
@@ -21,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   specialization TEXT,
   avatar_url TEXT,
   status TEXT DEFAULT 'ACTIVE',
+  consultation_fee DECIMAL(10, 2) DEFAULT 0.00,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -41,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.staff (
   specialization TEXT,
   avatar_url TEXT,
   status TEXT DEFAULT 'ACTIVE',
+  consultation_fee DECIMAL(10, 2) DEFAULT 0.00,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -53,8 +57,8 @@ BEGIN
     RETURN NEW;
   END IF;
   
-  INSERT INTO public.staff (id, name, email, role, department, designation, phone, degree, specialization, avatar_url, status, created_at, updated_at)
-  VALUES (NEW.id, NEW.name, NEW.email, NEW.role, NEW.department, NEW.designation, NEW.phone, NEW.degree, NEW.specialization, NEW.avatar_url, NEW.status, NEW.created_at, NEW.updated_at)
+  INSERT INTO public.staff (id, name, email, role, department, designation, phone, degree, specialization, avatar_url, status, consultation_fee, created_at, updated_at)
+  VALUES (NEW.id, NEW.name, NEW.email, NEW.role, NEW.department, NEW.designation, NEW.phone, NEW.degree, NEW.specialization, NEW.avatar_url, NEW.status, NEW.consultation_fee, NEW.created_at, NEW.updated_at)
   ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     email = EXCLUDED.email,
@@ -66,6 +70,7 @@ BEGIN
     specialization = EXCLUDED.specialization,
     avatar_url = EXCLUDED.avatar_url,
     status = EXCLUDED.status,
+    consultation_fee = EXCLUDED.consultation_fee,
     updated_at = EXCLUDED.updated_at;
   RETURN NEW;
 END;
@@ -87,8 +92,8 @@ BEGIN
   END IF;
 
   BEGIN
-    INSERT INTO public.profiles (id, name, email, role, department, designation, phone, degree, specialization, avatar_url, status, created_at, updated_at)
-    VALUES (NEW.id, NEW.name, NEW.email, NEW.role, NEW.department, NEW.designation, NEW.phone, NEW.degree, NEW.specialization, NEW.avatar_url, NEW.status, NEW.created_at, NEW.updated_at)
+    INSERT INTO public.profiles (id, name, email, role, department, designation, phone, degree, specialization, avatar_url, status, consultation_fee, created_at, updated_at)
+    VALUES (NEW.id, NEW.name, NEW.email, NEW.role, NEW.department, NEW.designation, NEW.phone, NEW.degree, NEW.specialization, NEW.avatar_url, NEW.status, NEW.consultation_fee, NEW.created_at, NEW.updated_at)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       email = EXCLUDED.email,
@@ -100,6 +105,7 @@ BEGIN
       specialization = EXCLUDED.specialization,
       avatar_url = EXCLUDED.avatar_url,
       status = EXCLUDED.status,
+      consultation_fee = EXCLUDED.consultation_fee,
       updated_at = EXCLUDED.updated_at;
   EXCEPTION
     WHEN OTHERS THEN

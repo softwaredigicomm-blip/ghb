@@ -167,6 +167,11 @@ export default function Expenses() {
   };
 
   const handleDeleteExpense = async (id: string) => {
+    const roleUpper = (currentUser?.role || '').toUpperCase();
+    if (roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') {
+      toast.error('Deletion of expense records is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const expenseToDelete = expenses.find(e => e.id === id);
     if (expenseToDelete && !canModify(expenseToDelete)) {
       toast.error('This expense record was created by administration and cannot be deleted by non-admin roles.');
@@ -493,9 +498,14 @@ export default function Expenses() {
                             }}>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDeleteExpense(expense.id)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {(() => {
+                              const r = (currentUser?.role || '').toUpperCase();
+                              return !(r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS');
+                            })() && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDeleteExpense(expense.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </>
                         ) : (
                           <Badge variant="secondary" className="text-[10px] text-slate-400 bg-slate-100 font-bold hover:bg-slate-100 select-none px-2 py-0.5">Admin Locked</Badge>

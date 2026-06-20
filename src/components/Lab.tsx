@@ -180,6 +180,10 @@ function LabQuickRegisterForm({ onRegistered, canMakeLabAndRadio }: { onRegister
 export default function Lab() {
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
   const isRadiologist = currentUser?.role === 'RADIOLOGIST';
+  const isDeleteForbidden = (() => {
+    const r = (currentUser?.role || '').toUpperCase();
+    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
+  })();
 
   const isUserAdmin = currentUser?.role === 'SUPER_ADMIN' || 
                       currentUser?.role === 'ADMIN' || 
@@ -562,6 +566,10 @@ export default function Lab() {
   };
 
   const handleDeleteBill = async (id: string) => {
+    if (isDeleteForbidden) {
+      toast.error('Deletion of lab bills is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     if (!checkPermission()) return;
     const bill = bills.find(b => b.id === id);
     if (bill && !canUserModifyRecord(bill, currentUser)) {
@@ -2663,9 +2671,11 @@ export default function Lab() {
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => printBill(bill)}>
                               <Printer className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDeleteBill(bill.id)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {!isDeleteForbidden && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDeleteBill(bill.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

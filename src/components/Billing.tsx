@@ -805,6 +805,11 @@ export default function Billing() {
   }, {});
 
   const handleDeleteBill = async (id: string) => {
+    const roleUpper = (currentUser?.role || '').toUpperCase();
+    if (roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') {
+      toast.error('Deletion of invoices is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const billToDelete = bills.find(b => b.id === id);
     if (billToDelete && !canModify(billToDelete)) {
       toast.error('This invoice was created by administration and cannot be cancelled by non-admin roles.');
@@ -1439,15 +1444,7 @@ export default function Billing() {
       return sum + val;
     }, 0);
 
-  const isAuthorized = currentUser && (
-    currentUser.role === 'SUPER_ADMIN' ||
-    currentUser.role === 'ADMIN' ||
-    currentUser.role === 'HOSPITAL_ADMIN' ||
-    currentUser.role === 'ACCOUNTANT' ||
-    currentUser.role === 'ACCOUNTS' ||
-    currentUser.role?.toUpperCase().includes('ADMIN') ||
-    currentUser.role?.toUpperCase().includes('ACCOUNT')
-  );
+  const isAuthorized = !!currentUser;
 
   if (!isAuthorized) {
     return (
@@ -2629,6 +2626,7 @@ export default function Billing() {
                       : filteredBills;
 
                     return displayedBills.map((bill) => {
+                      const roleUpper = (currentUser?.role || '').toUpperCase();
                       return (
                         <TableRow key={bill.id} className="border-slate-50 hover:bg-slate-50/50 transition-colors">
                           <TableCell className="font-bold text-medical-blue whitespace-nowrap">
@@ -2721,21 +2719,23 @@ export default function Billing() {
                                   }}>
                                     <Edit className="w-4 h-4" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={async () => {
-                                    if (bill.isExpense) {
-                                      const ok = await supabaseService.deleteExpense(bill.id);
-                                      if (ok) {
-                                        toast.success("Expense record removed");
-                                        fetchData();
+                                  {!(roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={async () => {
+                                      if (bill.isExpense) {
+                                        const ok = await supabaseService.deleteExpense(bill.id);
+                                        if (ok) {
+                                          toast.success("Expense record removed");
+                                          fetchData();
+                                        } else {
+                                          toast.error("Failed to remove expense record");
+                                        }
                                       } else {
-                                        toast.error("Failed to remove expense record");
+                                        handleDeleteBill(bill.id);
                                       }
-                                    } else {
-                                      handleDeleteBill(bill.id);
-                                    }
-                                  }}>
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                    }}>
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </>
                               ) : (
                                 <Badge variant="secondary" className="text-[10px] text-slate-400 bg-slate-100 font-bold hover:bg-slate-100 select-none px-2 py-0.5">Admin Locked</Badge>

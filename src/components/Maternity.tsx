@@ -53,6 +53,10 @@ import { canUserModifyRecord } from '@/utils/rbac';
 
 export default function Maternity() {
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
+  const isDeleteForbidden = (() => {
+    const r = (currentUser?.role || '').toUpperCase();
+    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
+  })();
   const [patients, setPatients] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [newborns, setNewborns] = useState<any[]>([]);
@@ -218,6 +222,10 @@ export default function Maternity() {
   };
 
   const handleDeleteDelivery = async (id: string) => {
+    if (isDeleteForbidden) {
+      toast.error('Deletion of delivery records is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const delivery = deliveries.find(d => d.id === id);
     if (delivery && !canUserModifyRecord(delivery, currentUser, staff)) {
       toast.error("Access Denied: This delivery record was created by an Admin and cannot be deleted by non-admin users.");
@@ -582,9 +590,11 @@ export default function Maternity() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-medical-blue hover:bg-blue-50" onClick={() => handleStartEdit(d)}>
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteDelivery(d.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {!isDeleteForbidden && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteDelivery(d.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -623,20 +633,22 @@ export default function Maternity() {
                     <Badge variant="outline" className="text-emerald-600 border-emerald-200">
                       {baby.gender}
                     </Badge>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50" 
-                      onClick={async () => {
-                        if (confirm('Are you sure you want to delete this newborn record?')) {
-                          await supabaseService.deleteNewborn(baby.id);
-                          toast.success('Newborn record deleted');
-                          fetchData();
-                        }
-                      }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    {!isDeleteForbidden && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50" 
+                        onClick={async () => {
+                          if (confirm('Are you sure you want to delete this newborn record?')) {
+                            await supabaseService.deleteNewborn(baby.id);
+                            toast.success('Newborn record deleted');
+                            fetchData();
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               )) : (

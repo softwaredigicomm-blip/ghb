@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import OPDPatientHistory from './OPDPatientHistory';
+import OPDSummaryView from './OPDSummaryView';
 import { 
   Search, 
   Plus, 
@@ -63,7 +64,7 @@ import { getPrescriptionPrintHtml } from '@/lib/prescriptionPrint';
 
 export default function OPD() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'queue' | 'appointments' | 'patients'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'appointments' | 'patients' | 'summary'>('queue');
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isAppointmentOpen, setIsAppointmentOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<any>(null);
@@ -106,6 +107,7 @@ export default function OPD() {
   const [isTokenSuccessOpen, setIsTokenSuccessOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>('all');
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>('');
   const [appointmentFee, setAppointmentFee] = useState<number>(() => {
     const charges = storage.get(STORAGE_KEYS.OPD_CHARGES, { reg: 200, appt: 300, consult: 500 });
     return charges.consult || 500;
@@ -174,6 +176,10 @@ export default function OPD() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
   const isAccountant = currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ACCOUNTS';
+  const isDeleteForbidden = (() => {
+    const r = (currentUser?.role || '').toUpperCase();
+    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
+  })();
 
   // Patient Clinical History states
   const [selectedPatientVitals, setSelectedPatientVitals] = useState<any[]>([]);
@@ -746,7 +752,8 @@ export default function OPD() {
         appointment_date: newAppointment.date || new Date().toISOString().split('T')[0],
         appointment_time: newAppointment.time || '10:00 AM',
         urgency: newAppointment.urgency,
-        doctor: newAppointment.doctor
+        doctor: newAppointment.doctor,
+        fee: selectedDocObj && selectedDocObj.consultationFee ? Number(selectedDocObj.consultationFee) : appointmentFee
       };
 
       const result = await supabaseService.updateAppointment(editingAppointment.id, updatedData);
@@ -788,7 +795,8 @@ export default function OPD() {
       appointment_time: newAppointment.time || '10:00 AM',
       status: 'Scheduled',
       urgency: newAppointment.urgency,
-      doctor: newAppointment.doctor
+      doctor: newAppointment.doctor,
+      fee: selectedDocObj && selectedDocObj.consultationFee ? Number(selectedDocObj.consultationFee) : appointmentFee
     });
 
     if (synced) {
@@ -836,14 +844,15 @@ export default function OPD() {
       }
 
       if (selectedApptFees.consult.checked) {
+        const docFee = selectedDocObj && selectedDocObj.consultationFee ? Number(selectedDocObj.consultationFee) : selectedApptFees.consult.amount;
         selectedInvoiceItems.push({
           item_name: `Consultation Fee - ${newAppointment.doctor || 'GP'}`,
           item_type: 'Consultation',
           quantity: 1,
-          unit_price: selectedApptFees.consult.amount,
-          total_price: selectedApptFees.consult.amount
+          unit_price: docFee,
+          total_price: docFee
         });
-        calculatedTotal += selectedApptFees.consult.amount;
+        calculatedTotal += docFee;
       }
 
       if (selectedInvoiceItems.length > 0) {
@@ -959,6 +968,11 @@ export default function OPD() {
   };
 
   const handleDeletePatient = async (id: string) => {
+    const roleUpper = (currentUser?.role || '').toUpperCase();
+    if (roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') {
+      toast.error('Deletion of patient profiles is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const patientToDelete = patients.find(p => p.id === id);
     if (patientToDelete && !canUserModifyRecord(patientToDelete, currentUser, users)) {
       toast.error("Access Denied: This patient record was created by an Admin and cannot be deleted by non-admin users.");
@@ -1024,6 +1038,11 @@ export default function OPD() {
   };
 
   const handleDeleteAppointment = async (id: string) => {
+    const roleUpper = (currentUser?.role || '').toUpperCase();
+    if (roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') {
+      toast.error('Deletion or cancellation of appointments is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const aptToDelete = appointments.find(a => a.id === id);
     if (aptToDelete && !canUserModifyRecord(aptToDelete, currentUser, users)) {
       toast.error("Access Denied: This appointment record was created by an Admin and cannot be cancelled or deleted by non-admin users.");
@@ -1805,9 +1824,20 @@ export default function OPD() {
         >
           Patient Records
         </Button>
+        <Button 
+          variant={activeTab === 'summary' ? 'secondary' : 'ghost'} 
+          size="sm" 
+          onClick={() => setActiveTab('summary')}
+          className={activeTab === 'summary' ? 'bg-white shadow-sm' : ''}
+        >
+          OPD Summary
+        </Button>
       </div>
 
-      <Card className="border-none shadow-sm">
+      {activeTab === 'summary' ? (
+        <OPDSummaryView appointments={appointments} users={users} />
+      ) : (
+        <Card className="border-none shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div className="flex items-center gap-4 flex-1">
             <div className="relative w-full max-w-sm">
@@ -1819,21 +1849,42 @@ export default function OPD() {
                 onChange={(e) => setPatientRecordsSearchQuery(e.target.value)}
               />
             </div>
-            {activeTab === 'queue' && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs shrink-0">Doctor:</Label>
-                <Select value={selectedDoctorFilter} onValueChange={setSelectedDoctorFilter}>
-                  <SelectTrigger className="w-[180px] h-9 bg-slate-50 border-none">
-                    <SelectValue placeholder="All Doctors" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Doctors</SelectItem>
-                    {users.filter(u => u.role?.toUpperCase() === 'DOCTOR' || u.role?.toUpperCase() === 'SUPER_ADMIN' || u.role?.toUpperCase() === 'SURGEON').map(doc => (
-                      <SelectItem key={doc.id} value={doc.name}>{doc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {(activeTab === 'queue' || activeTab === 'appointments') && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs shrink-0">Doctor:</Label>
+                  <Select value={selectedDoctorFilter} onValueChange={setSelectedDoctorFilter}>
+                    <SelectTrigger className="w-[160px] h-9 bg-slate-50 border-none">
+                      <SelectValue placeholder="All Doctors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Doctors</SelectItem>
+                      {users.filter(u => u.role?.toUpperCase() === 'DOCTOR' || u.role?.toUpperCase() === 'SUPER_ADMIN' || u.role?.toUpperCase() === 'SURGEON').map(doc => (
+                        <SelectItem key={doc.id} value={doc.name}>{doc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs shrink-0">Date:</Label>
+                  <Input 
+                    type="date" 
+                    className="w-[140px] h-9 bg-slate-50 border-none text-xs" 
+                    value={selectedDateFilter}
+                    onChange={(e) => setSelectedDateFilter(e.target.value)}
+                  />
+                  {selectedDateFilter && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 px-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-50 text-xs"
+                      onClick={() => setSelectedDateFilter('')}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </>
             )}
             <Button variant="outline" size="icon">
               <Filter className="w-4 h-4" />
@@ -1950,7 +2001,7 @@ export default function OPD() {
                               <Edit className="w-4 h-4" />
                             </Button>
                           )}
-                          {!isAccountant && (
+                          {!isAccountant && !isDeleteForbidden && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDeletePatient(patient.id)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -1981,10 +2032,14 @@ export default function OPD() {
                 <TableBody>
                   {appointments
                     .filter(apt => {
+                      const aptDate = typeof apt.appointment_date === 'string' ? apt.appointment_date : new Date(apt.appointment_date).toISOString().split('T')[0];
                       if (activeTab === 'queue') {
-                        const today = new Date().toISOString().split('T')[0];
-                        const aptDate = typeof apt.appointment_date === 'string' ? apt.appointment_date : new Date(apt.appointment_date).toISOString().split('T')[0];
-                        return aptDate === today;
+                        const targetDate = selectedDateFilter || new Date().toISOString().split('T')[0];
+                        return aptDate === targetDate;
+                      }
+                      // For appointments tab:
+                      if (selectedDateFilter) {
+                        return aptDate === selectedDateFilter;
                       }
                       return true; // Show all for 'appointments' tab
                     })
@@ -2091,7 +2146,7 @@ export default function OPD() {
                               <Edit className="w-4 h-4" />
                             </Button>
                           )}
-                          {!isAccountant && (
+                          {!isAccountant && !isDeleteForbidden && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDeleteAppointment(apt.id)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -2109,6 +2164,7 @@ export default function OPD() {
           </div>
         </CardContent>
       </Card>
+      )}
       {/* Token Success Dialog */}
       <Dialog open={isTokenSuccessOpen} onOpenChange={setIsTokenSuccessOpen}>
         <DialogContent className="sm:max-w-[400px]">

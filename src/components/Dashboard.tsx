@@ -19,7 +19,9 @@ import {
   Ticket,
   PlusCircle,
   HelpCircle,
-  ShieldCheck
+  ShieldCheck,
+  Bed,
+  Scissors
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -80,7 +82,7 @@ export default function Dashboard() {
 
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
   const showFinancials = !currentUser || 
-    ['SUPER_ADMIN', 'ADMIN', 'HOSPITAL_ADMIN', 'ACCOUNTANT'].includes(currentUser.role) || 
+    ['SUPER_ADMIN', 'ADMIN', 'HOSPITAL_ADMIN', 'ACCOUNTANT', 'ACCOUNTS'].includes(currentUser.role) || 
     currentUser.role?.toUpperCase().includes('ADMIN');
 
   // Walk-in Quick Appointment States
@@ -271,27 +273,121 @@ export default function Dashboard() {
     const totalExpenses = filteredExpensesList.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const netProfit = totalRevenue - totalExpenses;
 
+    const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
+    const userRole = (currentUser?.role || '').toUpperCase();
+
+    // Load helper data for role-specific stats
+    const allBeds = storage.get(STORAGE_KEYS.BEDS, []);
+    const occupiedBeds = allBeds.filter((b: any) => b.status === 'Occupied' || b.status?.toLowerCase() === 'occupied').length;
+    const totalBeds = allBeds.length;
+    const availableBeds = totalBeds - occupiedBeds;
+
+    const allOT = storage.get('hms_ot_schedules', []);
+    const allTasks = storage.get(STORAGE_KEYS.NURSING_TASKS, []);
+    const allAdmissions = storage.get('hms_admissions', []);
+
+    if (userRole === 'DOCTOR' || userRole === 'SURGEON') {
+      // Doctor role specific dashboards
+      const myAppointmentsToday = appointments.filter((apt: any) => {
+        const aptDate = apt.appointment_date || apt.date || '';
+        const isToday = aptDate.includes(new Date().toISOString().split('T')[0]);
+        const isMe = apt.doctor_id === currentUser?.id || apt.doctor === currentUser?.name || apt.doctorName === currentUser?.name;
+        return isToday && isMe;
+      }).length;
+
+      const myAssignedPatientsCount = patients.filter((p: any) => {
+        let match = p.attending_doctor_id === currentUser?.id;
+        if (!match) {
+          match = appointments.some((apt: any) => {
+            const pId = apt.patient_id || apt.patientId;
+            if (pId !== p.id) return false;
+            return apt.doctor_id === currentUser?.id || apt.doctor === currentUser?.name || apt.doctorName === currentUser?.name;
+          });
+        }
+        return match;
+      }).length;
+
+      const mySurgicals = allOT.filter((ot: any) => 
+        ot.surgeon_id === currentUser?.id || ot.surgeon === currentUser?.name || ot.doctor === currentUser?.name
+      ).length;
+
+      const myInpatients = allAdmissions.filter((ad: any) => 
+        ad.doctor_id === currentUser?.id || ad.attending_doctor === currentUser?.name
+      ).length;
+
+      return [
+        { name: 'My Assigned Patients', value: myAssignedPatientsCount.toString(), icon: Users, change: 'Active caseload', trend: 'up', color: 'bg-indigo-600' },
+        { name: 'My Today Consults', value: myAppointmentsToday.toString(), icon: Activity, change: 'Today\'s agenda', trend: 'up', color: 'bg-emerald-500' },
+        { name: 'My Surgical Cases', value: mySurgicals.toString(), icon: Scissors, change: 'OT Bookings', trend: 'up', color: 'bg-rose-500' },
+        { name: 'My Inpatients', value: myInpatients.toString(), icon: Bed, change: 'Under active care', trend: 'up', color: 'bg-blue-500' }
+      ];
+    } else if (userRole === 'NURSE') {
+      // Nurse role specific dashboards
+      const activeInpatients = allAdmissions.filter((ad: any) => ad.status === 'Admitted' || ad.status === 'Active' || ad.status?.toLowerCase().includes('admit')).length;
+      const myTasksPending = allTasks.filter((t: any) => t.status === 'Pending' || t.status === 'Scheduled').length;
+      const bedsInUse = occupiedBeds;
+      const todayShifts = storage.get('hms_nurse_shifts', []).length;
+
+      return [
+        { name: 'Active Inpatients', value: activeInpatients.toString(), icon: Users, change: 'Ward Census', trend: 'up', color: 'bg-indigo-500' },
+        { name: 'My Pending Nursing Tasks', value: myTasksPending.toString(), icon: Activity, change: 'Action items', trend: 'up', color: 'bg-rose-500' },
+        { name: 'Active Beds Rest', value: bedsInUse.toString(), icon: Bed, change: `${availableBeds} free beds`, trend: 'up', color: 'bg-blue-500' },
+        { name: 'Shift Schedules', value: todayShifts.toString(), icon: Clock, change: 'Duty Roster', trend: 'up', color: 'bg-teal-500' }
+      ];
+    } else if (userRole === 'RECEPTIONIST' || userRole === 'RECEPTION' || userRole === 'FRONT_DESK') {
+      // Receptionist role specific dashboards
+      const todayAppointments = appointments.filter((apt: any) => {
+        const aptDate = apt.appointment_date || apt.date || '';
+        return aptDate.includes(new Date().toISOString().split('T')[0]);
+      }).length;
+      const totalRegister = patients.length;
+      const bedsStatusStr = `${availableBeds} free beds`;
+
+      return [
+        { name: 'Today Token Bookings', value: todayAppointments.toString(), icon: Activity, change: 'Daily queue list', trend: 'up', color: 'bg-emerald-500' },
+        { name: 'Total Registered Patients', value: totalRegister.toString(), icon: Users, change: 'Active MRN logs', trend: 'up', color: 'bg-blue-500' },
+        { name: 'Admissions Bed Availability', value: availableBeds.toString(), icon: Bed, change: bedsStatusStr, trend: 'up', color: 'bg-teal-500' },
+        { name: 'Lobby Waiting Queue', value: appointments.filter(a => a.status === 'Waiting').length.toString(), icon: Clock, change: 'Patient check-ins', trend: 'up', color: 'bg-indigo-500' }
+      ];
+    } else if (userRole === 'ACCOUNTANT' || userRole === 'ACCOUNTS') {
+      // Accountant/Accounts role specific dashboards
+      const todayPaidInvoices = filteredBilling.filter((b: any) => {
+        const dateStr = b.created_at || b.date;
+        const isToday = dateStr && dateStr.includes(new Date().toISOString().split('T')[0]);
+        return isToday && (b.status === 'Paid' || b.status?.toLowerCase() === 'paid');
+      });
+      const todayIncome = todayPaidInvoices.reduce((acc, b) => acc + (Number(b.paid_amount) || 0), 0);
+      const unpaidInvoicesCount = filteredBilling.filter((b: any) => b.status === 'Unpaid' || b.status?.toLowerCase() === 'unpaid').length;
+
+      return [
+        { name: 'Total Paid Collections', value: formatCurrency(totalRevenue), icon: TrendingUp, change: 'Invoiced list', trend: 'up', color: 'bg-emerald-600' },
+        { name: 'Today Income Collects', value: formatCurrency(todayIncome), icon: TrendingUp, change: `${todayPaidInvoices.length} invoices paid today`, trend: 'up', color: 'bg-teal-500' },
+        { name: 'Unpaid / Draft Invoices', value: unpaidInvoicesCount.toString(), icon: Clock, change: 'Collections due', trend: 'down', color: 'bg-rose-500' },
+        { name: 'Operational Ledger Spent', value: formatCurrency(totalExpenses), icon: TrendingDown, change: 'Accounts payable', trend: 'down', color: 'bg-indigo-500' }
+      ];
+    }
+
+    // Default admin panels
     const baseStats = [
-      { name: 'Total Patients', value: totalPatients.toLocaleString(), icon: Users, change: '+0', trend: 'up', color: 'bg-blue-500' },
-      { name: 'OPD Transactions', value: appointmentCount.toString(), icon: Activity, change: '0%', trend: 'up', color: 'bg-teal-500' },
-      { name: 'IPD/OT Records', value: ipdCount.toString(), icon: CalendarIcon, change: '0%', trend: 'up', color: 'bg-indigo-500' },
+      { name: 'Total Patients', value: totalPatients.toLocaleString(), icon: Users, change: 'Total Registered', trend: 'up', color: 'bg-blue-500' },
+      { name: 'OPD Transactions', value: appointmentCount.toString(), icon: Activity, change: 'Invoiced count', trend: 'up', color: 'bg-teal-500' },
+      { name: 'IPD/OT Records', value: ipdCount.toString(), icon: CalendarIcon, change: 'Surgics/Admits', trend: 'up', color: 'bg-indigo-500' },
     ];
 
-    const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
     const showFinancials = !currentUser || 
-      ['SUPER_ADMIN', 'ADMIN', 'HOSPITAL_ADMIN', 'ACCOUNTANT'].includes(currentUser.role) || 
+      ['SUPER_ADMIN', 'ADMIN', 'HOSPITAL_ADMIN', 'ACCOUNTANT', 'ACCOUNTS'].includes(currentUser.role) || 
       currentUser.role?.toUpperCase().includes('ADMIN');
 
     if (showFinancials) {
       baseStats.push(
-        { name: 'Total Revenue', value: formatCurrency(totalRevenue), icon: TrendingUp, change: '0%', trend: 'up', color: 'bg-emerald-500' },
-        { name: 'Total Expenses', value: formatCurrency(totalExpenses), icon: TrendingDown, change: '0%', trend: 'down', color: 'bg-rose-500' },
-        { name: 'Net Income', value: formatCurrency(netProfit), icon: TrendingUp, change: '0%', trend: netProfit >= 0 ? 'up' : 'down', color: netProfit >= 0 ? 'bg-emerald-500' : 'bg-rose-500' }
+        { name: 'Total Revenue', value: formatCurrency(totalRevenue), icon: TrendingUp, change: 'Hospital revenue', trend: 'up', color: 'bg-emerald-500' },
+        { name: 'Total Expenses', value: formatCurrency(totalExpenses), icon: TrendingDown, change: 'Audit accounts ledger', trend: 'down', color: 'bg-rose-500' },
+        { name: 'Net Income', value: formatCurrency(netProfit), icon: TrendingUp, change: 'P&L summary', trend: netProfit >= 0 ? 'up' : 'down', color: netProfit >= 0 ? 'bg-emerald-500' : 'bg-rose-500' }
       );
     } else {
       const totalAppointments = appointments.length;
       baseStats.push(
-        { name: 'Total Bookings', value: totalAppointments.toString(), icon: Clock, change: 'Today', trend: 'up', color: 'bg-emerald-500' }
+        { name: 'Total Bookings', value: totalAppointments.toString(), icon: Clock, change: 'Total Schedule', trend: 'up', color: 'bg-emerald-500' }
       );
     }
 

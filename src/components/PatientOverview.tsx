@@ -63,6 +63,42 @@ export default function PatientOverview({ userRole }: { userRole?: string }) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<{url: string, name: string} | null>(null);
 
+  const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
+  const isDoctor = currentUser && (
+    currentUser.role?.toUpperCase() === 'DOCTOR' || 
+    currentUser.role?.toUpperCase() === 'SURGEON'
+  );
+
+  const assignedPatientIds = useMemo(() => {
+    if (!isDoctor || !currentUser) return null;
+    const ids = new Set<string>();
+    
+    // 1. Check attending_doctor_id
+    patients.forEach(p => {
+      if (p.attending_doctor_id === currentUser.id) {
+        ids.add(p.id);
+      }
+    });
+    
+    // 2. Check appointments
+    const allAppts = storage.get(STORAGE_KEYS.APPOINTMENTS, []);
+    allAppts.forEach((apt: any) => {
+      const isDocMatch = 
+        apt.doctor_id === currentUser.id || 
+        apt.doctor === currentUser.name || 
+        apt.doctorName === currentUser.name;
+        
+      if (isDocMatch) {
+        const pId = apt.patient_id || apt.patientId;
+        if (pId) {
+          ids.add(pId);
+        }
+      }
+    });
+    
+    return ids;
+  }, [patients, isDoctor, currentUser]);
+
   // Detail states
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [isPrescriptionOpen, setIsPrescriptionOpen] = useState(false);
@@ -114,13 +150,18 @@ export default function PatientOverview({ userRole }: { userRole?: string }) {
     if (patientIdFromUrl) {
       const patient = patients.find(p => p.id === patientIdFromUrl);
       if (patient) {
+        if (isDoctor && assignedPatientIds && !assignedPatientIds.has(patient.id)) {
+          setSelectedPatient(null);
+          toast.error("Access Denied: You do not have permission to view this patient.");
+          return;
+        }
         setSelectedPatient(patient);
         fetchPatientDetails(patientIdFromUrl);
       }
     } else {
       setSelectedPatient(null);
     }
-  }, [patientIdFromUrl, patients]);
+  }, [patientIdFromUrl, patients, isDoctor, assignedPatientIds]);
 
   const fetchPatientDetails = async (id: string) => {
     const [appts, bills, rx, vts, labs, claims, rads, dels, babies, notes] = await Promise.all([
@@ -277,6 +318,10 @@ export default function PatientOverview({ userRole }: { userRole?: string }) {
   const filteredPatients = useMemo(() => {
     let result = patients.filter(p => p.status !== 'Discharged' && p.status !== 'discharged');
     
+    if (isDoctor && assignedPatientIds) {
+      result = result.filter(p => assignedPatientIds.has(p.id));
+    }
+
     if (activeCategory !== 'All') {
       result = result.filter(p => p.registration_type === activeCategory);
     }
@@ -291,7 +336,7 @@ export default function PatientOverview({ userRole }: { userRole?: string }) {
     }
     
     return result;
-  }, [searchQuery, patients, activeCategory]);
+  }, [searchQuery, patients, activeCategory, isDoctor, assignedPatientIds]);
 
   const handleShareWhatsApp = () => {
     if (!selectedPatient) return;
@@ -571,6 +616,12 @@ View full details at: ${shareUrl}
 
   const handleDeletePatient = async () => {
     if (!selectedPatient) return;
+    
+    const roleUpper = (userRole || '').toUpperCase();
+    if (roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') {
+      toast.error('Deletion of patient profiles is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     
     if (!window.confirm(`Are you sure you want to PERMANENTLY delete ${selectedPatient.name} and all associated records? This action cannot be undone.`)) {
       return;

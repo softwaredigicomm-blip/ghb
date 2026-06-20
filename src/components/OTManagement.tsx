@@ -36,6 +36,10 @@ import { canUserModifyRecord } from '@/utils/rbac';
 
 export default function OTManagement() {
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
+  const isDeleteForbidden = (() => {
+    const r = (currentUser?.role || '').toUpperCase();
+    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
+  })();
   const [theatres, setTheatres] = useState<OperationTheatre[]>([]);
   const [records, setRecords] = useState<OperationRecord[]>([]);
   const [patients, setPatients] = useState<any[]>([]);
@@ -141,6 +145,10 @@ export default function OTManagement() {
   };
 
   const handleDeleteRecord = async (id: string) => {
+    if (isDeleteForbidden) {
+      toast.error('Deletion of OT scheduling is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const record = records.find(r => r.id === id);
     if (record && !canUserModifyRecord(record, currentUser, staff)) {
       toast.error("Access Denied: This OT scheduling record was created by an Admin and cannot be deleted by non-admin users.");
@@ -480,9 +488,11 @@ export default function OTManagement() {
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-medical-blue hover:bg-blue-50">
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteRecord(record.id)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {!isDeleteForbidden && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteRecord(record.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>

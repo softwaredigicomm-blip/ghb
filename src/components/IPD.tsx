@@ -340,6 +340,10 @@ export default function IPD() {
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
   const isCurrentUserAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'HOSPITAL_ADMIN' || currentUser?.role === 'ADMIN' || currentUser?.role?.toUpperCase().includes('ADMIN');
   const isAccountant = currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ACCOUNTS';
+  const isDeleteForbidden = (() => {
+    const r = (currentUser?.role || '').toUpperCase();
+    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
+  })();
 
   // --- NEW WORKFLOWS STATE ---
   const [activeTab, setActiveTab] = useState<'registration' | 'beds' | 'surgery' | 'discharge'>('beds');
@@ -1257,6 +1261,10 @@ export default function IPD() {
   };
 
   const handleDeleteNote = async (id: string) => {
+    if (isDeleteForbidden) {
+      toast.error('Deletion of clinical notes is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const note = clinicalNotes.find(n => n.id === id);
     if (note && !canUserModifyRecord(note, currentUser, users)) {
       toast.error("Access Denied: This clinical note was added by an Admin and cannot be deleted by non-admin users.");
@@ -1279,6 +1287,10 @@ export default function IPD() {
   };
 
   const handleDeleteBed = async (id: string) => {
+    if (isDeleteForbidden) {
+      toast.error('Deletion of bed configurations is restricted for Front Office, Doctor, and Accountant roles.');
+      return;
+    }
     const bed = beds.find(b => b.id === id);
     if (bed && !canUserModifyRecord(bed, currentUser, users)) {
       toast.error("Access Denied: This bed config was created by an Admin and cannot be deleted by non-admin users.");
@@ -1980,9 +1992,11 @@ export default function IPD() {
                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400">
                                   <Edit className="w-3 h-3" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-500" onClick={() => handleDeleteBed(bed.id)}>
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
+                                {!isDeleteForbidden && (
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-rose-500" onClick={() => handleDeleteBed(bed.id)}>
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                )}
                               </>
                             )}
                           </div>
@@ -3844,14 +3858,16 @@ export default function IPD() {
                             <p className="text-xs font-bold text-medical-blue uppercase">{authorName}</p>
                             <p className="text-[10px] text-slate-400 mt-0.5">{dateFormatted}</p>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => handleDeleteNote(note.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                          {!isDeleteForbidden && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => handleDeleteNote(note.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </div>
                         <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{note.content}</p>
                       </div>
@@ -3906,14 +3922,16 @@ export default function IPD() {
                             <p className="text-xs font-bold text-emerald-600 uppercase">{authorName}</p>
                             <p className="text-[10px] text-slate-400 mt-0.5">{dateFormatted}</p>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => handleDeleteNote(note.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                          {!isDeleteForbidden && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => handleDeleteNote(note.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </div>
                         <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{note.content}</p>
                       </div>
