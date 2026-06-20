@@ -3050,6 +3050,9 @@ const cacheConfig: Record<string, { storageKey: string; defaultVal: any }> = {
   getClinicalNotes: { storageKey: 'hms_clinical_notes', defaultVal: [] },
   getPharmacyItems: { storageKey: STORAGE_KEYS.INVENTORY, defaultVal: MOCK_INVENTORY },
   getPharmacySettings: { storageKey: 'hms_pharmacy_settings', defaultVal: DEFAULT_PHARMACY_SETTINGS },
+  getQuickRegistrations: { storageKey: 'hms_quick_registrations', defaultVal: [] },
+  getLiveQueue: { storageKey: 'hms_live_queue', defaultVal: [] },
+  getDashboardStats: { storageKey: 'hms_dashboard_stats', defaultVal: { patientCount: 0, appointmentCount: 0, admissionCount: 0, totalRevenue: 0 } },
 };
 
 function updateLocalCacheOnMutation(key: string, args: any[], result: any) {
@@ -3158,6 +3161,16 @@ function updateLocalCacheOnMutation(key: string, args: any[], result: any) {
         const filtered = list.filter((p: any) => p.id !== result.id);
         filtered.unshift(result);
         storage.set(STORAGE_KEYS.INVENTORY, filtered);
+      } else if (k.includes('quickregistration') || k.includes('quick_registration')) {
+        const list = storage.get('hms_quick_registrations', []);
+        const filtered = list.filter((q: any) => q.id !== result.id);
+        filtered.unshift(result);
+        storage.set('hms_quick_registrations', filtered);
+      } else if (k.includes('livequeue') || k.includes('live_queue')) {
+        const list = storage.get('hms_live_queue', []);
+        const filtered = list.filter((q: any) => q.id !== result.id);
+        filtered.unshift(result);
+        storage.set('hms_live_queue', filtered);
       }
     } else if (key.startsWith('update')) {
       const id = args[0];
@@ -3211,6 +3224,14 @@ function updateLocalCacheOnMutation(key: string, args: any[], result: any) {
         const list = storage.get(STORAGE_KEYS.RADIOLOGY_FILES, []);
         const updated = list.map((r: any) => r.id === id ? { ...r, ...result } : r);
         storage.set(STORAGE_KEYS.RADIOLOGY_FILES, updated);
+      } else if (k.includes('quickregistration') || k.includes('quick_registration')) {
+        const list = storage.get('hms_quick_registrations', []);
+        const updated = list.map((q: any) => q.id === id ? { ...q, ...result } : q);
+        storage.set('hms_quick_registrations', updated);
+      } else if (k.includes('livequeue') || k.includes('live_queue')) {
+        const list = storage.get('hms_live_queue', []);
+        const updated = list.map((q: any) => q.id === id ? { ...q, ...result } : q);
+        storage.set('hms_live_queue', updated);
       }
     } else if (key.startsWith('delete')) {
       const id = args[0];
@@ -3278,6 +3299,10 @@ function updateLocalCacheOnMutation(key: string, args: any[], result: any) {
         const list = storage.get(STORAGE_KEYS.INVENTORY, MOCK_INVENTORY);
         const filtered = list.filter((p: any) => p.id !== id);
         storage.set(STORAGE_KEYS.INVENTORY, filtered);
+      } else if (k.includes('livequeue') || k.includes('live_queue')) {
+        const list = storage.get('hms_live_queue', []);
+        const filtered = list.filter((item: any) => item.id !== id);
+        storage.set('hms_live_queue', filtered);
       }
     }
   } catch (err) {
@@ -3416,6 +3441,14 @@ function executeOfflineMutation(key: string, args: any[]): any {
         const list = storage.get(STORAGE_KEYS.INVENTORY, MOCK_INVENTORY);
         list.unshift(item);
         storage.set(STORAGE_KEYS.INVENTORY, list);
+      } else if (k.includes('quickregistration') || k.includes('quick_registration')) {
+        const list = storage.get('hms_quick_registrations', []);
+        list.unshift(item);
+        storage.set('hms_quick_registrations', list);
+      } else if (k.includes('livequeue') || k.includes('live_queue')) {
+        const list = storage.get('hms_live_queue', []);
+        list.push(item);
+        storage.set('hms_live_queue', list);
       }
       
       let concept = 'general';
@@ -3582,6 +3615,28 @@ function executeOfflineMutation(key: string, args: any[]): any {
           return list[index];
         }
       }
+
+      if (k.includes('quickregistration') || k.includes('quick_registration')) {
+        const list = storage.get('hms_quick_registrations', []);
+        const index = list.findIndex((q: any) => q.id === id);
+        if (index !== -1) {
+          list[index] = { ...list[index], ...updates };
+          storage.set('hms_quick_registrations', list);
+          broadcastDataMutation('quick_registrations', 'update');
+          return list[index];
+        }
+      }
+
+      if (k.includes('livequeue') || k.includes('live_queue')) {
+        const list = storage.get('hms_live_queue', []);
+        const index = list.findIndex((q: any) => q.id === id);
+        if (index !== -1) {
+          list[index] = { ...list[index], ...updates };
+          storage.set('hms_live_queue', list);
+          broadcastDataMutation('live_queue', 'update');
+          return list[index];
+        }
+      }
       
       broadcastDataMutation(concept, 'update');
       return { id, ...updates };
@@ -3673,6 +3728,16 @@ function executeOfflineMutation(key: string, args: any[]): any {
         const filtered = list.filter((p: any) => p.id !== id);
         storage.set(STORAGE_KEYS.INVENTORY, filtered);
         broadcastDataMutation('pharmacy_items', 'delete');
+      } else if (k.includes('quickregistration') || k.includes('quick_registration')) {
+        const list = storage.get('hms_quick_registrations', []);
+        const filtered = list.filter((q: any) => q.id !== id);
+        storage.set('hms_quick_registrations', filtered);
+        broadcastDataMutation('quick_registrations', 'delete');
+      } else if (k.includes('livequeue') || k.includes('live_queue')) {
+        const list = storage.get('hms_live_queue', []);
+        const filtered = list.filter((q: any) => q.id !== id);
+        storage.set('hms_live_queue', filtered);
+        broadcastDataMutation('live_queue', 'delete');
       } else if (k.includes('test') || k.includes('request')) {
         const list = storage.get(STORAGE_KEYS.LAB_TEST_ORDERS, []);
         const filtered = list.filter((r: any) => r.id !== id);
@@ -3748,6 +3813,17 @@ function executeOfflineQuery(key: string, args: any[]): any {
       });
     } else if (key === 'getPatients') {
       cached = cached.map(normalizePatient);
+    } else if (key === 'getLiveQueue') {
+      const patientsList = storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS);
+      cached = cached.map((item: any) => {
+        const pid = item.patient_id || item.patientId;
+        const p = patientsList.find((p_item: any) => p_item.id === pid || p_item.mrn === pid);
+        return {
+          ...item,
+          patients: p ? { name: p.name, mrn: p.mrn, age: p.age, gender: p.gender } : null,
+          patient_id: pid
+        };
+      });
     } else if (key === 'getBeds') {
       cached = cached.map(normalizeBed);
     } else if (key === 'getDischargeSummaries') {
