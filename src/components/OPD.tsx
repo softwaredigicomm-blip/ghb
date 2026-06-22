@@ -126,8 +126,8 @@ export default function OPD() {
   const [selectedApptFees, setSelectedApptFees] = useState(() => {
     const charges = storage.get(STORAGE_KEYS.OPD_CHARGES, { reg: 200, appt: 300, consult: 500 });
     return {
-      reg: { name: 'OPD Registration Fee', checked: false, amount: charges.reg },
-      appt: { name: 'Appointment Fee', checked: true, amount: charges.appt },
+      reg: { name: 'OPD Registration Fee', checked: true, amount: 0 },
+      appt: { name: 'Appointment Fee', checked: true, amount: 0 },
       consult: { name: 'Consultation Fee', checked: true, amount: charges.consult }
     };
   });
@@ -286,8 +286,8 @@ export default function OPD() {
         consult: { name: 'Consultation Fee', checked: false, amount: charges.consult }
       });
       setSelectedApptFees({
-        reg: { name: 'OPD Registration Fee', checked: false, amount: charges.reg },
-        appt: { name: 'Appointment Fee', checked: true, amount: charges.appt },
+        reg: { name: 'OPD Registration Fee', checked: true, amount: 0 },
+        appt: { name: 'Appointment Fee', checked: true, amount: 0 },
         consult: { name: 'Consultation Fee', checked: true, amount: charges.consult }
       });
     };
@@ -1325,7 +1325,22 @@ export default function OPD() {
                     <Label>Doctor</Label>
                     <Select 
                       value={newAppointment.doctor}
-                      onValueChange={(v) => setNewAppointment({...newAppointment, doctor: v})}
+                      onValueChange={(v) => {
+                        setNewAppointment({...newAppointment, doctor: v});
+                        const matchedDoc = users.find(u => u.name === v || u.id === v);
+                        if (matchedDoc) {
+                          const fee = matchedDoc.consultationFee !== undefined && matchedDoc.consultationFee !== null
+                            ? Number(matchedDoc.consultationFee)
+                            : 500;
+                          setSelectedApptFees(prev => ({
+                            ...prev,
+                            consult: {
+                              ...prev.consult,
+                              amount: fee
+                            }
+                          }));
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select doctor" />
@@ -1385,7 +1400,6 @@ export default function OPD() {
                         <span className="text-xs text-slate-400">₹</span>
                         <Input 
                           type="number"
-                          disabled={!selectedApptFees.reg.checked}
                           value={selectedApptFees.reg.amount}
                           onChange={(e) => setSelectedApptFees({
                             ...selectedApptFees, 
@@ -1418,7 +1432,6 @@ export default function OPD() {
                         <span className="text-xs text-slate-400">₹</span>
                         <Input 
                           type="number"
-                          disabled={!selectedApptFees.appt.checked}
                           value={selectedApptFees.appt.amount}
                           onChange={(e) => setSelectedApptFees({
                             ...selectedApptFees, 
@@ -1451,7 +1464,6 @@ export default function OPD() {
                         <span className="text-xs text-slate-400">₹</span>
                         <Input 
                           type="number"
-                          disabled={!selectedApptFees.consult.checked}
                           value={selectedApptFees.consult.amount}
                           onChange={(e) => {
                             const val = Number(e.target.value);
@@ -2106,7 +2118,7 @@ export default function OPD() {
                            variant="outline" 
                            className={`${apt.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'} border-none`}
                          >
-                           {apt.payment_status || 'Pending'}
+                           {(apt.payment_status || 'Pending') === 'Paid' ? `Paid - ₹${apt.fee || appointmentFee}` : `Pending - ₹${apt.fee || appointmentFee}`}
                          </Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">

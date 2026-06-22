@@ -42,6 +42,7 @@ import { supabaseService } from '@/services/supabaseService';
 import { useDataSync } from '@/hooks/useDataSync';
 import { getPrescriptionPrintHtml } from '@/lib/prescriptionPrint';
 import { getPathologyReportHtml, getRadiologyReportHtml, getMaternityReportHtml } from '@/lib/reportPrint';
+import { getPatientReportHtml } from '@/lib/patientReportPrint';
 import { 
   Dialog, 
   DialogContent, 
@@ -318,6 +319,39 @@ export default function PatientOverview({ userRole }: { userRole?: string }) {
       undefined,
       hospitalInfo
     );
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const handlePrintPatient360Report = () => {
+    if (!selectedPatient) return;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=1000');
+    if (!printWindow) {
+      toast.error('Please allow popups to print report');
+      return;
+    }
+
+    const hospitalInfo = storage.get<{ name: string; address: string; phone: string }>(STORAGE_KEYS.HOSPITAL_INFO, {
+      name: 'GLOBAL HOSPITAL',
+      address: '123 Healthcare Way, Medical City',
+      phone: '+91 98765 43210'
+    });
+
+    const html = getPatientReportHtml({
+      patient: selectedPatient,
+      vitals,
+      clinicalNotes,
+      prescriptions,
+      labOrders,
+      radiologyRecords,
+      billing,
+      staff,
+      currentBed,
+      hospitalInfo,
+      dues
+    });
 
     printWindow.document.write(html);
     printWindow.document.close();
@@ -774,7 +808,7 @@ View full details at: ${shareUrl}
             <FileText className="w-4 h-4" />
             Blank Prescription
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => window.print()}>
+          <Button variant="outline" className="gap-2" onClick={handlePrintPatient360Report}>
             <Printer className="w-4 h-4" />
             Print Report
           </Button>

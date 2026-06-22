@@ -1404,7 +1404,7 @@ export default function Billing() {
   }
 
   const totalHospitalRevenue = bills.reduce((sum, b) => {
-    const val = Number(b.paid_amount ?? b.paidAmount ?? b.payable_amount ?? b.payableAmount ?? b.total_amount ?? b.totalAmount ?? 0);
+    const val = Number(b.paid_amount ?? b.paidAmount ?? 0);
     return sum + val;
   }, 0);
 
@@ -1418,7 +1418,7 @@ export default function Billing() {
       return typeLower !== 'pharmacy' && typeLower !== 'lab' && !hasPharmacyOrLab;
     })
     .reduce((sum, b) => {
-      const val = Number(b.paid_amount ?? b.paidAmount ?? b.payable_amount ?? b.payableAmount ?? b.total_amount ?? b.totalAmount ?? 0);
+      const val = Number(b.paid_amount ?? b.paidAmount ?? 0);
       return sum + val;
     }, 0);
 
@@ -1429,7 +1429,7 @@ export default function Billing() {
       return typeLower === 'pharmacy' || hasPharmacy;
     })
     .reduce((sum, b) => {
-      const val = Number(b.paid_amount ?? b.paidAmount ?? b.payable_amount ?? b.payableAmount ?? b.total_amount ?? b.totalAmount ?? 0);
+      const val = Number(b.paid_amount ?? b.paidAmount ?? 0);
       return sum + val;
     }, 0);
 
@@ -1440,7 +1440,7 @@ export default function Billing() {
       return typeLower === 'lab' || hasLab;
     })
     .reduce((sum, b) => {
-      const val = Number(b.paid_amount ?? b.paidAmount ?? b.payable_amount ?? b.payableAmount ?? b.total_amount ?? b.totalAmount ?? 0);
+      const val = Number(b.paid_amount ?? b.paidAmount ?? 0);
       return sum + val;
     }, 0);
 

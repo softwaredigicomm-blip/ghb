@@ -434,7 +434,8 @@ export default function IPD() {
     followUpDate: '',
     medications: '',
     clinicalSummary: '',
-    dischargeDate: new Date().toISOString().substring(0, 10)
+    dischargeDate: new Date().toISOString().substring(0, 10),
+    dischargeBy: ''
   });
   const [dischargeAuxDetails, setDischargeAuxDetails] = useState<{
     vitals: any[];
@@ -700,6 +701,14 @@ export default function IPD() {
     }
   };
 
+  const getAttendingDoctorName = (patientId: string) => {
+    const pat = patients.find(p => p.id === patientId) || MOCK_PATIENTS.find(p => p.id === patientId);
+    if (!pat) return '';
+    const docId = pat.attending_doctor_id || pat.attendingDoctorId;
+    const doc = users.find(u => u.id === docId) || MOCK_USERS.find(u => u.id === docId);
+    return doc ? doc.name : '';
+  };
+
   const checkPatientDues = (patientId: string) => {
     const patientBills = invoices.filter(b => b.patient_id === patientId || b.patientId === patientId);
     const total = patientBills.reduce((acc, b) => acc + (Number(b.total_amount) || Number(b.total) || 0), 0);
@@ -757,7 +766,7 @@ export default function IPD() {
       medications,
       clinicalSummary,
       dischargeDate: finalDischargeDate,
-      dischargeBy: currentUser?.name || 'Duty Doctor',
+      dischargeBy: dischargeForm.dischargeBy || currentUser?.name || 'Dr. Rajesh Sharma',
       admissionDate: admissionDateVal
     };
 
@@ -807,7 +816,8 @@ export default function IPD() {
       followUpDate: '',
       medications: '',
       clinicalSummary: '',
-      dischargeDate: new Date().toISOString().substring(0, 10)
+      dischargeDate: new Date().toISOString().substring(0, 10),
+      dischargeBy: ''
     });
     setDischargeSearchTerm('');
     setBypassDues(false);
@@ -815,7 +825,7 @@ export default function IPD() {
 
   const printDischargeSummary = (summary: any) => {
     if (!summary) return;
-    const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId));
+    const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId)) || MOCK_PATIENTS.find(p => p.id === (summary.patient_id || summary.patientId));
     const rawHospitalInfo = storage.get(STORAGE_KEYS.HOSPITAL_INFO, null);
     const hospitalName = rawHospitalInfo?.name || 'GLOBAL HOSPITAL';
     const hospitalSubHeader = rawHospitalInfo?.address || 'Healthcare Center';
@@ -2896,7 +2906,12 @@ export default function IPD() {
                                 key={p.id}
                                 className="px-3 py-2 hover:bg-indigo-50/50 cursor-pointer flex justify-between items-center transition-colors text-left"
                                 onClick={() => {
-                                  setDischargeForm({ ...dischargeForm, patientId: p.id });
+                                  const autoDoc = getAttendingDoctorName(p.id);
+                                  setDischargeForm({ 
+                                    ...dischargeForm, 
+                                    patientId: p.id, 
+                                    dischargeBy: autoDoc || currentUser?.name || 'Dr. Rajesh Sharma' 
+                                  });
                                   setDischargeSearchTerm(p.name);
                                   setShowDischargeSearchDropdown(false);
                                   if (p.status !== 'Admitted') {
@@ -2946,8 +2961,13 @@ export default function IPD() {
                     <Select
                       value={dischargeForm.patientId}
                       onValueChange={(v) => {
-                        setDischargeForm({...dischargeForm, patientId: v});
-                        const pat = patients.find(p => p.id === v);
+                        const autoDoc = getAttendingDoctorName(v);
+                        setDischargeForm({
+                          ...dischargeForm,
+                          patientId: v,
+                          dischargeBy: autoDoc || currentUser?.name || 'Dr. Rajesh Sharma'
+                        });
+                        const pat = patients.find(p => p.id === v) || MOCK_PATIENTS.find(p => p.id === v);
                         if (pat) setDischargeSearchTerm(pat.name);
                       }}
                     >
@@ -3255,7 +3275,7 @@ export default function IPD() {
                   );
                 })()}
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div className="space-y-1.5 col-span-1">
                     <Label className="text-xs font-bold text-slate-700">Discharge Date</Label>
                     <Input
@@ -3290,6 +3310,16 @@ export default function IPD() {
                       type="date"
                       value={dischargeForm.followUpDate}
                       onChange={(e) => setDischargeForm({...dischargeForm, followUpDate: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 col-span-1">
+                    <Label className="text-xs font-bold text-slate-700">Discharging Doctor</Label>
+                    <Input
+                      type="text"
+                      placeholder="Doctor name"
+                      value={dischargeForm.dischargeBy}
+                      onChange={(e) => setDischargeForm({...dischargeForm, dischargeBy: e.target.value})}
                     />
                   </div>
                 </div>
@@ -3449,7 +3479,7 @@ export default function IPD() {
                   dischargeSummaries.length > 0 ? (
                     <div className="space-y-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
                       {dischargeSummaries.map((summary: any) => {
-                        const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId));
+                        const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId)) || MOCK_PATIENTS.find(p => p.id === (summary.patient_id || summary.patientId));
                         const isLama = summary.dischargeType?.includes('LAMA');
                         const isDeath = summary.dischargeType?.includes('Deceased');
                         return (
@@ -3584,7 +3614,7 @@ export default function IPD() {
                           </TableHeader>
                           <TableBody>
                             {dischargeSummaries.filter(summary => {
-                              const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId));
+                              const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId)) || MOCK_PATIENTS.find(p => p.id === (summary.patient_id || summary.patientId));
                               if (!pat) return false;
                               const matchSearch = pat.name.toLowerCase().includes(reportSearchQuery.toLowerCase()) ||
                                                   (pat.mrn || '').toLowerCase().includes(reportSearchQuery.toLowerCase()) ||
@@ -3593,7 +3623,7 @@ export default function IPD() {
                               return matchSearch && matchFilter;
                             }).length > 0 ? (
                               dischargeSummaries.filter(summary => {
-                                const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId));
+                                const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId)) || MOCK_PATIENTS.find(p => p.id === (summary.patient_id || summary.patientId));
                                 if (!pat) return false;
                                 const matchSearch = pat.name.toLowerCase().includes(reportSearchQuery.toLowerCase()) ||
                                                     (pat.mrn || '').toLowerCase().includes(reportSearchQuery.toLowerCase()) ||
@@ -3601,7 +3631,7 @@ export default function IPD() {
                                 const matchFilter = reportTypeFilter === 'All' || summary.dischargeType === reportTypeFilter;
                                 return matchSearch && matchFilter;
                               }).map((summary: any) => {
-                                const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId)) || { name: 'Unknown', mrn: 'N/A', age: 'N/A', gender: 'N/A', phone: 'N/A' };
+                                const pat = patients.find(p => p.id === (summary.patient_id || summary.patientId)) || MOCK_PATIENTS.find(p => p.id === (summary.patient_id || summary.patientId)) || { name: 'Unknown', mrn: 'N/A', age: 'N/A', gender: 'N/A', phone: 'N/A' };
                                 const admissionRecord = admissions.find(a => a.patient_id === pat.id || a.patientId === pat.id);
                                 const isLama = (summary.dischargeType || '').includes('LAMA');
                                 const isDeath = (summary.dischargeType || '').includes('Deceased');
@@ -4242,7 +4272,7 @@ export default function IPD() {
           </DialogHeader>
 
           {dischargedSummaryToShow && (() => {
-            const pat = patients.find(p => p.id === (dischargedSummaryToShow.patient_id || dischargedSummaryToShow.patientId));
+            const pat = patients.find(p => p.id === (dischargedSummaryToShow.patient_id || dischargedSummaryToShow.patientId)) || MOCK_PATIENTS.find(p => p.id === (dischargedSummaryToShow.patient_id || dischargedSummaryToShow.patientId));
             return (
               <>
                 <div className="flex-1 p-6 space-y-5 overflow-y-auto custom-scrollbar">
