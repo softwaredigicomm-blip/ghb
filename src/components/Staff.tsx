@@ -59,6 +59,27 @@ export default function Staff() {
   const [editingStaff, setEditingStaff] = useState<any>(null);
   const [newStaff, setNewStaff] = useState({ name: '', role: 'doctor', department: '', email: '', phone: '', specialty: '', consultationFee: '' });
 
+  const isDoctorOrSurgeon = (role: string) => {
+    const r = (role || '').toUpperCase();
+    return r.includes('DOCTOR') || r.includes('SURGEON');
+  };
+
+  const mapDbRoleToFormRole = (dbRole: string): string => {
+    if (!dbRole) return 'doctor';
+    const r = dbRole.toUpperCase().trim();
+    if (r === 'RECEPTIONIST') return 'reception';
+    if (r === 'LAB_TECHNICIAN') return 'lab_staff';
+    return r.toLowerCase();
+  };
+
+  const mapFormRoleToDbRole = (formRole: string): string => {
+    if (!formRole) return 'DOCTOR';
+    const r = formRole.toLowerCase().trim();
+    if (r === 'reception') return 'RECEPTIONIST';
+    if (r === 'lab_staff') return 'LAB_TECHNICIAN';
+    return r.toUpperCase().replace(' ', '_');
+  };
+
   const fetchData = async () => {
     setLoading(true);
     const data = await supabaseService.getStaff();
@@ -76,10 +97,10 @@ export default function Staff() {
     const staffToAdd = {
       name: newStaff.name,
       email: newStaff.email,
-      role: newStaff.role.toUpperCase().replace(' ', '_'),
+      role: mapFormRoleToDbRole(newStaff.role),
       department: newStaff.department,
       specialization: newStaff.specialty,
-      consultationFee: newStaff.role === 'doctor' && newStaff.consultationFee ? Number(newStaff.consultationFee) : 0,
+      consultationFee: isDoctorOrSurgeon(newStaff.role) && newStaff.consultationFee ? Number(newStaff.consultationFee) : 0,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newStaff.name}`
     };
 
@@ -102,10 +123,10 @@ export default function Staff() {
     const updates = {
       name: editingStaff.name,
       email: editingStaff.email,
-      role: editingStaff.role.toUpperCase().replace(' ', '_'),
+      role: mapFormRoleToDbRole(editingStaff.role),
       department: editingStaff.department,
       specialization: editingStaff.specialty,
-      consultationFee: editingStaff.role === 'doctor' && editingStaff.consultationFee ? Number(editingStaff.consultationFee) : 0,
+      consultationFee: isDoctorOrSurgeon(editingStaff.role) && editingStaff.consultationFee ? Number(editingStaff.consultationFee) : 0,
       avatar: editingStaff.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${editingStaff.name}`
     };
 
@@ -230,9 +251,11 @@ export default function Staff() {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="super_admin">Super Admin</SelectItem>
                         <SelectItem value="doctor">Doctor</SelectItem>
+                        <SelectItem value="surgeon">Surgeon</SelectItem>
                         <SelectItem value="nurse">Nurse</SelectItem>
-                        <SelectItem value="reception">Reception</SelectItem>
+                        <SelectItem value="reception">Receptionist</SelectItem>
                         <SelectItem value="pharmacist">Pharmacist</SelectItem>
                         <SelectItem value="lab_staff">Lab Staff</SelectItem>
                         <SelectItem value="accountant">Accountant</SelectItem>
@@ -264,7 +287,7 @@ export default function Staff() {
                       onChange={(e) => setNewStaff({...newStaff, email: e.target.value})}
                     />
                   </div>
-                  {newStaff.role === 'doctor' && (
+                  {isDoctorOrSurgeon(newStaff.role) && (
                     <div className="space-y-2">
                       <Label>Consultation Fee (₹)</Label>
                       <Input 
@@ -369,7 +392,7 @@ export default function Staff() {
                         <span className="text-xs text-muted-foreground">{user.department || 'Administration'}</span>
                         {(user.role?.toUpperCase().includes('DOCTOR') || user.role?.toUpperCase().includes('SURGEON')) && (
                           <span className="text-[11px] font-semibold text-emerald-600 mt-0.5">
-                            Consultation: ₹{user.consultationFee || 0}
+                            Consultation: ₹{user.consultationFee ?? user.consultation_fee ?? 0}
                           </span>
                         )}
                       </div>
@@ -399,17 +422,19 @@ export default function Staff() {
                             size="icon" 
                             className="h-8 w-8 hover:bg-medical-blue/10 hover:text-medical-blue" 
                             onClick={() => {
-                              if (!canUserModifyRecord(user, currentUser, staff)) {
-                                toast.error("Access Denied: This staff profile was created by an Admin and cannot be modified by non-admin users.");
-                                return;
+                              try {
+                                setEditingStaff({
+                                  ...user,
+                                  role: mapDbRoleToFormRole(user.role),
+                                  specialty: user.specialization || '',
+                                  consultationFee: user.consultationFee !== undefined && user.consultationFee !== null 
+                                    ? String(user.consultationFee) 
+                                    : (user.consultation_fee !== undefined && user.consultation_fee !== null ? String(user.consultation_fee) : '')
+                                });
+                                setIsEditOpen(true);
+                              } catch (err) {
+                                console.error('Error opening edit staff details:', err);
                               }
-                              setEditingStaff({
-                                ...user,
-                                role: user.role.toLowerCase(), // Lowercase for select items
-                                specialty: user.specialization || '',
-                                consultationFee: user.consultationFee !== undefined ? user.consultationFee : ''
-                              });
-                              setIsEditOpen(true);
                             }}
                           >
                             <Edit className="w-4 h-4" />
@@ -465,9 +490,11 @@ export default function Staff() {
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="doctor">Doctor</SelectItem>
+                  <SelectItem value="surgeon">Surgeon</SelectItem>
                   <SelectItem value="nurse">Nurse</SelectItem>
-                  <SelectItem value="reception">Reception</SelectItem>
+                  <SelectItem value="reception">Receptionist</SelectItem>
                   <SelectItem value="pharmacist">Pharmacist</SelectItem>
                   <SelectItem value="lab_staff">Lab Staff</SelectItem>
                   <SelectItem value="accountant">Accountant</SelectItem>
@@ -499,7 +526,7 @@ export default function Staff() {
                 onChange={(e) => setEditingStaff({...editingStaff, email: e.target.value})}
               />
             </div>
-            {editingStaff?.role === 'doctor' && (
+            {isDoctorOrSurgeon(editingStaff?.role) && (
               <div className="space-y-2 col-span-2">
                 <Label>Consultation Fee (₹)</Label>
                 <Input 
