@@ -291,12 +291,13 @@ export default function Dashboard() {
   // Derive Stats
   const dashboardStats = useMemo(() => {
     // Process OPD appointments to calculate Direct Consultation Revenue (to align with OPD summary)
-    const opdConsultationEarnings = appointments.reduce((sum, apt) => {
+    const opdApts = appointments.filter((apt: any) => !apt.type || apt.type === 'OPD');
+    const opdConsultationEarnings = opdApts.reduce((sum, apt) => {
       const docName = apt.doctor || apt.doctorName || 'General Consultation';
-      let feeVal = Number(apt.fee || apt.cleanFee);
+      let feeVal = Number(apt.fee);
       if (!feeVal || isNaN(feeVal)) {
         const foundDoc = users.find((u: any) => u.name === docName);
-        feeVal = foundDoc?.consultationFee ? Number(foundDoc.consultationFee) : 550;
+        feeVal = foundDoc?.consultationFee ? Number(foundDoc.consultationFee) : 500;
       }
       return sum + feeVal;
     }, 0);
