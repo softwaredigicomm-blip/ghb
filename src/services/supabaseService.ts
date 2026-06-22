@@ -1762,12 +1762,12 @@ const rawSupabaseService = {
     const feeValue = dbStaff.consultationFee !== undefined ? dbStaff.consultationFee : dbStaff.consultation_fee;
     if (feeValue !== undefined && feeValue !== null) {
       cleanDegree = `${cleanDegree} [fee:${feeValue}]`.trim();
-      dbStaff.consultation_fee = Number(feeValue);
     }
     
     dbStaff.degree = cleanDegree;
     delete dbStaff.password;
     delete dbStaff.consultationFee;
+    delete dbStaff.consultation_fee;
     return dbStaff;
   },
 

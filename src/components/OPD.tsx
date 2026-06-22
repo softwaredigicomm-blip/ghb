@@ -364,21 +364,11 @@ export default function OPD() {
       setSavedPrescriptions([mappedSaved, ...savedPrescriptions]);
       toast.success(`Prescription saved for ${selectedPatient.name}`);
       setIsPrescriptionOpen(false);
-      // Reset form dynamically using the first available doctor or our logged-in name
-      let initialDoc = '';
-      const activeDocs = users.filter((u: any) => u.role?.toUpperCase() === 'DOCTOR' || u.role?.toUpperCase() === 'SUPER_ADMIN' || u.role?.toUpperCase() === 'SURGEON');
-      if (currentUser?.role === 'DOCTOR' || currentUser?.role === 'SUPER_ADMIN') {
-        const foundSelf = activeDocs.find(d => d.name === currentUser.name);
-        if (foundSelf) initialDoc = foundSelf.name;
-      }
-      if (!initialDoc && activeDocs.length > 0) {
-        initialDoc = activeDocs[0].name;
-      }
-      const defaultDoc = activeDocs.find((u: any) => u.role?.toUpperCase() === 'DOCTOR') || activeDocs.find((u: any) => u.name && u.name.toLowerCase().includes('dr.')) || activeDocs[0];
-      const fallbackDocName = defaultDoc ? defaultDoc.name : 'Dr. Rajesh Sharma';
+      // Reset form dynamically using the prefetched doctor
+      const initialDoc = getPrefetchedDoctorName(selectedPatient);
 
       setPrescription({
-        doctor: initialDoc || fallbackDocName,
+        doctor: initialDoc,
         date: new Date().toISOString().split('T')[0],
         medicines: [{ name: '', dosage: '', frequency: '', duration: '' }],
         advice: '',
@@ -390,25 +380,63 @@ export default function OPD() {
     }
   };
 
+  const getPrefetchedDoctorName = (patient: any) => {
+    if (!patient) return 'Dr. Rajesh Sharma';
+    
+    // 1. Look for active appointment for this patient (not cancelled status)
+    const patientApts = appointments.filter((apt: any) => 
+      apt.patientId === patient.id && 
+      apt.status !== 'Cancelled'
+    );
+    
+    if (patientApts.length > 0) {
+      // Sort by date, prioritize today's appointments, otherwise newest first
+      const todayStr = new Date().toISOString().split('T')[0];
+      const sortedApts = [...patientApts].sort((a: any, b: any) => {
+        const dateA = a.appointment_date || '';
+        const dateB = b.appointment_date || '';
+        if (dateA === todayStr && dateB !== todayStr) return -1;
+        if (dateB === todayStr && dateA !== todayStr) return 1;
+        return dateB.localeCompare(dateA);
+      });
+      const latestApt = sortedApts[0];
+      const docName = latestApt.doctorName || latestApt.doctor;
+      if (docName) {
+        return docName;
+      }
+    }
+
+    // 2. Fallback to currently logged-in Doctor/Admin
+    const activeDocs = users.filter((u: any) => 
+      u.role?.toUpperCase() === 'DOCTOR' || 
+      u.role?.toUpperCase() === 'SUPER_ADMIN' || 
+      u.role?.toUpperCase() === 'SURGEON'
+    );
+    
+    if (currentUser?.role === 'DOCTOR' || currentUser?.role === 'SUPER_ADMIN') {
+      const foundSelf = activeDocs.find(d => d.name === currentUser.name);
+      if (foundSelf) return foundSelf.name;
+    }
+
+    // 3. Fallback to default/first doctor in directory
+    if (activeDocs.length > 0) {
+      const defaultDoc = activeDocs.find((u: any) => u.role?.toUpperCase() === 'DOCTOR') || 
+                          activeDocs.find((u: any) => u.name && u.name.toLowerCase().includes('dr.')) || 
+                          activeDocs[0];
+      return defaultDoc.name;
+    }
+
+    return 'Dr. Rajesh Sharma';
+  };
+
   const openPrescriptionModal = (patient: any) => {
     setSelectedPatient(patient);
     loadPatientHistory(patient.id);
     
-    let initialDoc = '';
-    const activeDocs = users.filter((u: any) => u.role?.toUpperCase() === 'DOCTOR' || u.role?.toUpperCase() === 'SUPER_ADMIN' || u.role?.toUpperCase() === 'SURGEON');
-    if (currentUser?.role === 'DOCTOR' || currentUser?.role === 'SUPER_ADMIN') {
-      const foundSelf = activeDocs.find(d => d.name === currentUser.name);
-      if (foundSelf) initialDoc = foundSelf.name;
-    }
-    if (!initialDoc && activeDocs.length > 0) {
-      initialDoc = activeDocs[0].name;
-    }
-    
-    const defaultDoc = activeDocs.find((u: any) => u.role?.toUpperCase() === 'DOCTOR') || activeDocs.find((u: any) => u.name && u.name.toLowerCase().includes('dr.')) || activeDocs[0];
-    const fallbackDocName = defaultDoc ? defaultDoc.name : 'Dr. Rajesh Sharma';
+    const initialDoc = getPrefetchedDoctorName(patient);
 
     setPrescription({
-      doctor: initialDoc || fallbackDocName,
+      doctor: initialDoc,
       date: new Date().toISOString().split('T')[0],
       medicines: [{ name: '', dosage: '', frequency: '', duration: '' }],
       advice: '',

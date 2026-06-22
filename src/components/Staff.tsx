@@ -127,7 +127,10 @@ export default function Staff() {
       department: editingStaff.department,
       specialization: editingStaff.specialty,
       consultationFee: isDoctorOrSurgeon(editingStaff.role) && editingStaff.consultationFee ? Number(editingStaff.consultationFee) : 0,
-      avatar: editingStaff.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${editingStaff.name}`
+      avatar: editingStaff.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${editingStaff.name}`,
+      degree: editingStaff.degree || '',
+      password: editingStaff.password || '',
+      phone: editingStaff.phone || null
     };
 
     const result = await supabaseService.updateStaff(editingStaff.id, updates);

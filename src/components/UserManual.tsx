@@ -27,8 +27,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { storage, STORAGE_KEYS } from '@/lib/storage';
 
 interface ManualSection {
   id: string;
@@ -49,11 +50,41 @@ export default function UserManual() {
   const [activeManualTab, setActiveManualTab] = useState('all');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     'getting-started': true,
-    'pharmacy-pos': true
+    'pharmacy-pos': true,
+    'opd-flow': true
   });
+
+  const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
+  const userRole = (currentUser?.role || '').toUpperCase();
+  const userName = currentUser?.name || 'Guest User';
 
   const toggleSection = (id: string) => {
     setExpandedSections(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const hasRoleAccess = (urole: string, sectionRoles: string[]) => {
+    const r = (urole || '').toUpperCase().trim();
+    
+    // Admins have access to all guidelines
+    if (r === 'SUPER_ADMIN' || r === 'ADMIN' || r === 'HOSPITAL_ADMIN') {
+      return true;
+    }
+    
+    return sectionRoles.some(secRole => {
+      const s = secRole.toUpperCase().trim();
+      if (s === r) return true;
+      
+      // Map common role equivalents
+      if (s === 'DOCTOR' && (r === 'DOCTOR' || r === 'SURGEON' || r === 'CLINICIAN')) return true;
+      if (s === 'SURGEON' && (r === 'SURGEON' || r === 'DOCTOR')) return true;
+      if (s === 'RECEPTIONIST' && (r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'FRONT_OFFICE')) return true;
+      if (s === 'ACCOUNTANT' && (r === 'ACCOUNTANT' || r === 'ACCOUNTS')) return true;
+      if (s === 'LAB_STAFF' && (r === 'LAB_STAFF' || r === 'RADIOLOGIST' || r === 'TECHNICIAN' || r === 'LAB')) return true;
+      if (s === 'PHARMACIST' && r === 'PHARMACIST') return true;
+      if (s === 'NURSE' && r === 'NURSE') return true;
+      
+      return false;
+    });
   };
 
   const manualSections: ManualSection[] = [
@@ -62,7 +93,7 @@ export default function UserManual() {
       title: 'Administrator Dashboard & Basic Setup',
       subtitle: 'Hospital configuration, metrics overview, and quick patient register.',
       icon: Settings,
-      role: ['SUPER_ADMIN', 'RECEPTIONIST', 'NURSE'],
+      role: ['SUPER_ADMIN', 'RECEPTIONIST', 'RECEPTION', 'FRONT_DESK', 'NURSE', 'ADMIN', 'HOSPITAL_ADMIN'],
       steps: [
         {
           title: 'Quick Register & Intake Flow',
@@ -78,10 +109,10 @@ export default function UserManual() {
     },
     {
       id: 'opd-flow',
-      title: 'Outpatient Department (OPD) Consultation',
-      subtitle: 'Doctor queue, digital prescriptions, vital entry, and case history records.',
+      title: 'Outpatient Department (OPD) Consultation & Prescriptions',
+      subtitle: 'Doctor queue, digital prescriptions, vital entry, auto-fetched doctor details, and patient history.',
       icon: Stethoscope,
-      role: ['SUPER_ADMIN', 'DOCTOR', 'RECEPTIONIST', 'NURSE'],
+      role: ['SUPER_ADMIN', 'DOCTOR', 'RECEPTIONIST', 'RECEPTION', 'FRONT_DESK', 'NURSE'],
       steps: [
         {
           title: 'Booking & Queuing Appoints',
@@ -90,6 +121,11 @@ export default function UserManual() {
         {
           title: 'Recording Symptoms, Vitals & Examination',
           description: 'From the Doctor queue list, click "Consult" or "Modify". Insert critical clinical logs: Blood Pressure, Pulse, Core Temperature, Chief Complaints, Clinical Observations, and Diagnosis.',
+        },
+        {
+          title: 'Automated Doctor Prefilling for Prescriptions',
+          description: 'When writing a prescription, the system automatically fetches the doctor who is fixed with the patient\'s active appointment to prevent selection errors. If that assigned doctor is unavailable or another specialist steps in, the Doctor input remains fully editable, allowing selection of any available practitioner from the dropdown.',
+          tips: ['Automatic lookup optimizes doctor-to-prescription matching.', 'Always confirm the final consulting doctor list when printing.']
         },
         {
           title: 'Generating Digital Prescriptions',
@@ -101,22 +137,23 @@ export default function UserManual() {
     {
       id: 'ipd-flow',
       title: 'Inpatient (IPD) Admissions & Nursing Ward',
-      subtitle: 'Bed assignments, medication logs, nurse checklists, and ward monitoring.',
+      subtitle: 'Bed assignments, medication logs, nurse checklists, and multi-stage discharge clearances.',
       icon: Calendar,
       role: ['SUPER_ADMIN', 'DOCTOR', 'NURSE'],
       steps: [
         {
           title: 'Patient Intake & Bed Allocations',
           description: 'Navigate to "IPD Management". If a doctor recommends hospitalization, click "Admit Patient". Select the patient, the admitting doctor, the diagnosis, and assign a physical bed.',
-          tips: ['Supported ward categories: General Ward, Semi-Private, Deluxe Cabin, and ICU.', 'Beds currently occupied will show up as red in real-time. Available beds are in green.']
+          tips: ['Supported ... ward categories: General Ward, Semi-Private, Deluxe Cabin, and ICU.', 'Beds currently occupied will show up as red in real-time. Available beds are in green.']
         },
         {
           title: 'Hourly Nursing Station Checklist',
           description: 'Go to the "Nursing Station" tab. This dashboard lists all current residential ward patients. Nurses can write hourly medical logs, administer medication sheets mapped from pharmacy stocks, register continuous vital charting (BP/Temp/SpO2), and trigger immediate emergency alerts.',
         },
         {
-          title: 'Initiating Ward Transfers & Discharge Summary',
-          description: 'Easily transfer a patient to a different ward (e.g., General to ICU) depending on patient condition updates. During physical discharge, click "Generate Discharge Summary" to map out summary advisories, medication course rules, and release authorizations.',
+          title: 'Multi-Department Discharge Clearance Checklist',
+          description: 'To clear a patient for discharge, a strict 4-tier check schema is followed: (1) Attending Doctor marks clinical clearance, (2) Ward Nurse registers physical checklist verification, (3) Accountant validates full ledger bills, and (4) Receptionist confirms safe recovery checkouts and handovers.',
+          tips: ['Discharge Clearance avoids premature checkout errors.', 'The checklist updates in real-time for all connected staff interfaces.']
         }
       ]
     },
@@ -171,7 +208,7 @@ export default function UserManual() {
       title: 'Billing & TPA Insurance Management',
       subtitle: 'Invoice creation, discharge billing, and TPA pre-authorization details.',
       icon: CreditCard,
-      role: ['SUPER_ADMIN', 'ACCOUNTANT', 'RECEPTIONIST'],
+      role: ['SUPER_ADMIN', 'ACCOUNTANT', 'RECEPTIONIST', 'RECEPTION', 'FRONT_DESK'],
       steps: [
         {
           title: 'Invoice Consolidation & Generation',
@@ -220,7 +257,13 @@ export default function UserManual() {
     toast.success('User manual guidelines configured! Use Ctrl+P or Cmd+P to export as highly polished PDF.');
   };
 
-  const filteredSections = manualSections.filter(section => {
+  // Filter sections dynamically so that ONLY parts of manual relevant to the user are shown!
+  const accessibleSections = manualSections.filter(section => {
+    if (!currentUser) return true; // fallback for safety
+    return hasRoleAccess(userRole, section.role);
+  });
+
+  const filteredSections = accessibleSections.filter(section => {
     const matchesSearch = section.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           section.subtitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           section.steps.some(step => 
@@ -231,8 +274,10 @@ export default function UserManual() {
     if (activeManualTab === 'all') {
       return matchesSearch;
     }
-    return matchesSearch && section.role.includes(activeManualTab.toUpperCase().replace('-', '_'));
+    return matchesSearch && section.role.some(r => r.toUpperCase().replace('-', '_') === activeManualTab.toUpperCase().replace('-', '_'));
   });
+
+  const isAdmin = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'HOSPITAL_ADMIN';
 
   return (
     <div className="p-4 lg:p-8 max-w-6xl mx-auto space-y-6 print:p-0 print:bg-white print:max-w-full">
@@ -241,8 +286,8 @@ export default function UserManual() {
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             <span className="bg-medical-blue text-white text-[10px] font-black tracking-widest px-2 py-0.5 rounded-full uppercase">Helpdesk</span>
-            <span className="flex items-center gap-1 text-[11px] font-black text-amber-600 uppercase bg-amber-50 px-20 py-0.5 rounded-full">
-              <Sparkles className="w-3 h-3 animate-pulse" /> Updated for POS v3.2
+            <span className="flex items-center gap-1 text-[11px] font-black text-amber-600 uppercase bg-amber-50 px-3 py-0.5 rounded-full">
+              <Sparkles className="w-3 h-3 animate-pulse" /> Updated for POS & Prefilling
             </span>
           </div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
@@ -280,40 +325,79 @@ export default function UserManual() {
             />
           </div>
           
-          {/* Quick Stats Summary Card */}
-          <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800">
-              <CheckCircle2 className="w-5 h-5" />
+          {/* Dynamic Safe Access control indicator */}
+          {currentUser ? (
+            isAdmin ? (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-800 flex-shrink-0 animate-pulse">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[9px] text-blue-700 font-bold uppercase tracking-wider">🔒 Full Admin Mode</p>
+                  <p className="text-xs font-bold text-slate-700 leading-tight">All department guides are fully visible.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 flex-shrink-0">
+                  <Users className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-[9px] text-amber-700 font-bold uppercase tracking-wider">🔒 Role Isolated ({userRole})</p>
+                  <p className="text-xs font-bold text-slate-700 leading-tight">Showing only guides relevant to you ({userName}).</p>
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-slate-600 flex-shrink-0">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Guest Mode</p>
+                <p className="text-xs font-bold text-slate-700 leading-tight">Browsing with generic view options.</p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Loose Stock Conversion Act</p>
-              <p className="text-xs font-bold text-slate-700">Active proportional auto-splitting enabled.</p>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Roles Navigation Filter Tabs */}
+        {/* Roles Navigation Filter Tabs (Filtered dynamically based on access) */}
         <div>
-          <Tabs defaultValue="all" className="w-full" onValueChange={setActiveManualTab}>
+          <Tabs defaultValue="all" value={activeManualTab} className="w-full" onValueChange={setActiveManualTab}>
             <TabsList className="bg-slate-100 p-1 rounded-xl flex flex-wrap gap-1 h-auto overflow-x-auto w-full max-w-full">
               <TabsTrigger value="all" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
                 🌟 All Guidelines
               </TabsTrigger>
-              <TabsTrigger value="super-admin" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
-                ⚙️ Administrators
-              </TabsTrigger>
-              <TabsTrigger value="doctor" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
-                🩺 Doctors (OPD/OT)
-              </TabsTrigger>
-              <TabsTrigger value="nurse" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
-                🛌 Nurses (IPD)
-              </TabsTrigger>
-              <TabsTrigger value="pharmacist" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer font-black text-amber-700">
-                💊 Pharmacists
-              </TabsTrigger>
-              <TabsTrigger value="accountant" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
-                💳 Accountants
-              </TabsTrigger>
+              
+              {(isAdmin || hasRoleAccess(userRole, ['SUPER_ADMIN'])) && (
+                <TabsTrigger value="super-admin" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
+                  ⚙️ Administrators
+                </TabsTrigger>
+              )}
+              
+              {(isAdmin || hasRoleAccess(userRole, ['DOCTOR'])) && (
+                <TabsTrigger value="doctor" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
+                  🩺 Doctors (OPD/OT)
+                </TabsTrigger>
+              )}
+              
+              {(isAdmin || hasRoleAccess(userRole, ['NURSE'])) && (
+                <TabsTrigger value="nurse" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
+                  🛌 Nurses (IPD)
+                </TabsTrigger>
+              )}
+              
+              {(isAdmin || hasRoleAccess(userRole, ['PHARMACIST'])) && (
+                <TabsTrigger value="pharmacist" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer font-black text-amber-750">
+                  💊 Pharmacists
+                </TabsTrigger>
+              )}
+              
+              {(isAdmin || hasRoleAccess(userRole, ['ACCOUNTANT'])) && (
+                <TabsTrigger value="accountant" className="text-xs font-bold px-4 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-800 transition-all cursor-pointer">
+                  💳 Accountants
+                </TabsTrigger>
+              )}
             </TabsList>
           </Tabs>
         </div>
