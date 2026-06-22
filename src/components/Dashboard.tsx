@@ -192,7 +192,10 @@ export default function Dashboard() {
     const now = new Date(); 
     
     return invoices.filter(bill => {
-      const billDate = new Date(bill.created_at);
+      const dateVal = bill.created_at || bill.date;
+      if (!dateVal) return false;
+      const billDate = new Date(dateVal);
+      if (isNaN(billDate.getTime())) return false;
       
       if (timeFrame === 'today') {
         const today = new Date();
@@ -265,9 +268,53 @@ export default function Dashboard() {
 
   // Derive Stats
   const dashboardStats = useMemo(() => {
-    const totalRevenue = filteredBilling.reduce((acc, b) => acc + (Number(b.paid_amount) || 0), 0);
-    const appointmentCount = filteredBilling.filter(b => b.invoice_items?.some((i: any) => i.category === 'OPD')).length;
-    const ipdCount = filteredBilling.filter(b => b.invoice_items?.some((i: any) => i.category === 'IPD' || i.category === 'OT')).length;
+    const totalRevenue = filteredBilling.reduce((acc, b) => acc + (Number(b.paid_amount ?? b.paidAmount ?? 0)), 0);
+    
+    // Dynamic OPD / IPD count and collection calculation
+    let opdCollectionAmount = 0;
+    let opdTransCount = 0;
+    let ipdCount = 0;
+
+    filteredBilling.forEach(b => {
+      const typeUpper = (b.type || b.category || '').toUpperCase();
+      const items = b.invoice_items || b.items || [];
+      const billPaid = Number(b.paid_amount ?? b.paidAmount ?? 0);
+      const billTotal = Number(b.total_amount ?? b.totalAmount ?? 0) || 1;
+      const paymentRatio = billPaid / billTotal;
+
+      const hasOpdItem = items.some((i: any) => {
+        const cat = (i.category || '').toUpperCase();
+        return ['OPD', 'CONSULTATION', 'OPD/CONSULTANCY'].includes(cat) || (i.description || '').toUpperCase().includes('OPD');
+      });
+
+      const hasIpdItem = items.some((i: any) => {
+        const cat = (i.category || '').toUpperCase();
+        return ['IPD', 'OT', 'SURGERY', 'WARD'].includes(cat) || 
+               (i.description || '').toUpperCase().includes('ROOM CHARGES') || 
+               (i.description || '').toUpperCase().includes('SURGERY') ||
+               (i.description || '').toUpperCase().includes('WARD');
+      });
+
+      if (hasIpdItem || typeUpper === 'IPD' || typeUpper === 'OT') {
+        ipdCount += 1;
+      }
+
+      if (hasOpdItem || typeUpper === 'OPD' || typeUpper === 'CONSULTATION') {
+        opdTransCount += 1;
+        
+        // Sum OPD item values inside the invoice
+        const opdItemsValue = items.filter((i: any) => {
+          const cat = (i.category || '').toUpperCase();
+          return ['OPD', 'CONSULTATION', 'OPD/CONSULTANCY'].includes(cat) || (i.description || '').toUpperCase().includes('OPD');
+        }).reduce((sum, item) => sum + Number(item.total_price ?? item.amount ?? 0), 0);
+
+        if (opdItemsValue > 0) {
+          opdCollectionAmount += opdItemsValue * paymentRatio;
+        } else {
+          opdCollectionAmount += billPaid;
+        }
+      }
+    });
     
     const totalPatients = patients.length;
     const totalExpenses = filteredExpensesList.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
@@ -356,7 +403,7 @@ export default function Dashboard() {
         const isToday = dateStr && dateStr.includes(new Date().toISOString().split('T')[0]);
         return isToday && (b.status === 'Paid' || b.status?.toLowerCase() === 'paid');
       });
-      const todayIncome = todayPaidInvoices.reduce((acc, b) => acc + (Number(b.paid_amount) || 0), 0);
+      const todayIncome = todayPaidInvoices.reduce((acc, b) => acc + (Number(b.paid_amount ?? b.paidAmount ?? 0)), 0);
       const unpaidInvoicesCount = filteredBilling.filter((b: any) => b.status === 'Unpaid' || b.status?.toLowerCase() === 'unpaid').length;
 
       return [
@@ -370,7 +417,7 @@ export default function Dashboard() {
     // Default admin panels
     const baseStats = [
       { name: 'Total Patients', value: totalPatients.toLocaleString(), icon: Users, change: 'Total Registered', trend: 'up', color: 'bg-blue-500' },
-      { name: 'OPD Transactions', value: appointmentCount.toString(), icon: Activity, change: 'Invoiced count', trend: 'up', color: 'bg-teal-500' },
+      { name: 'OPD Collections', value: formatCurrency(opdCollectionAmount), icon: Activity, change: `${opdTransCount} OPD Transactions`, trend: 'up', color: 'bg-teal-500' },
       { name: 'IPD/OT Records', value: ipdCount.toString(), icon: CalendarIcon, change: 'Surgics/Admits', trend: 'up', color: 'bg-indigo-500' },
     ];
 
@@ -404,17 +451,25 @@ export default function Dashboard() {
     };
 
     filteredBilling.forEach(bill => {
-      bill.invoice_items?.forEach((item: any) => {
-        if (item.category === 'Pharmacy') categories['Pharmacy'].value += Number(item.total_price) || 0;
-        else if (item.category === 'Pathology' || item.category === 'Radiology') categories['Lab & Rad'].value += Number(item.total_price) || 0;
-        else if (item.category === 'OPD') categories['OPD/Consultancy'].value += Number(item.total_price) || 0;
-        else categories['Main Billing'].value += Number(item.total_price) || 0;
+      const items = bill.invoice_items || bill.items || [];
+      const billPaid = Number(bill.paid_amount ?? bill.paidAmount ?? 0);
+      const billTotal = Number(bill.total_amount ?? bill.totalAmount ?? 0) || 1;
+      const paymentRatio = billPaid / billTotal;
+
+      items.forEach((item: any) => {
+        const cat = (item.category || '').toUpperCase();
+        const price = Number(item.total_price ?? item.amount ?? 0) * paymentRatio;
+
+        if (cat === 'PHARMACY') categories['Pharmacy'].value += price;
+        else if (['PATHOLOGY', 'RADIOLOGY', 'LAB', 'PATH', 'RADIO'].includes(cat)) categories['Lab & Rad'].value += price;
+        else if (['OPD', 'CONSULTATION', 'OPD/CONSULTANCY'].includes(cat)) categories['OPD/Consultancy'].value += price;
+        else categories['Main Billing'].value += price;
       });
     });
 
     return Object.entries(categories).map(([name, data]) => ({
       name,
-      value: data.value,
+      value: Math.round(data.value),
       color: data.color
     })).filter(d => d.value > 0);
   }, [filteredBilling]);
@@ -686,11 +741,26 @@ export default function Dashboard() {
         <CardContent className="p-0">
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 divide-x divide-slate-50">
             {[
-              { dept: 'OPD', count: filteredBilling.filter(b => b.invoice_items?.some((i: any) => i.category === 'OPD')).length, label: 'OPD Visits', color: 'bg-blue-500' },
-              { dept: 'IPD', count: filteredBilling.filter(b => b.invoice_items?.some((i: any) => i.category === 'IPD')).length, label: 'IPD Days', color: 'bg-indigo-500' },
-              { dept: 'Pharmacy', count: filteredBilling.filter(b => b.invoice_items?.some((i: any) => i.category === 'Pharmacy')).length, label: 'RX Sold', color: 'bg-teal-500' },
-              { dept: 'Lab/Rad', count: filteredBilling.filter(b => b.invoice_items?.some((i: any) => i.category === 'Pathology' || i.category === 'Radiology')).length, label: 'Test Reports', color: 'bg-purple-500' },
-              { dept: 'OT', count: filteredBilling.filter(b => b.invoice_items?.some((i: any) => i.category === 'OT')).length, label: 'OT Records', color: 'bg-rose-500' },
+              { dept: 'OPD', count: filteredBilling.filter(b => {
+                const items = b.invoice_items || b.items || [];
+                return (b.type || b.category || '').toUpperCase() === 'OPD' || items.some((i: any) => ['OPD', 'CONSULTATION', 'OPD/CONSULTANCY'].includes((i.category || '').toUpperCase()));
+              }).length, label: 'OPD Visits', color: 'bg-blue-500' },
+              { dept: 'IPD', count: filteredBilling.filter(b => {
+                const items = b.invoice_items || b.items || [];
+                return (b.type || b.category || '').toUpperCase() === 'IPD' || items.some((i: any) => (i.category || '').toUpperCase() === 'IPD');
+              }).length, label: 'IPD Days', color: 'bg-indigo-500' },
+              { dept: 'Pharmacy', count: filteredBilling.filter(b => {
+                const items = b.invoice_items || b.items || [];
+                return (b.type || b.category || '').toUpperCase() === 'PHARMACY' || items.some((i: any) => (i.category || '').toUpperCase() === 'PHARMACY');
+              }).length, label: 'RX Sold', color: 'bg-teal-500' },
+              { dept: 'Lab/Rad', count: filteredBilling.filter(b => {
+                const items = b.invoice_items || b.items || [];
+                return (b.type || b.category || '').toUpperCase() === 'LAB' || items.some((i: any) => ['PATHOLOGY', 'RADIOLOGY', 'LAB', 'PATH', 'RADIO'].includes((i.category || '').toUpperCase()));
+              }).length, label: 'Test Reports', color: 'bg-purple-500' },
+              { dept: 'OT', count: filteredBilling.filter(b => {
+                const items = b.invoice_items || b.items || [];
+                return (b.type || b.category || '').toUpperCase() === 'OT' || items.some((i: any) => (i.category || '').toUpperCase() === 'OT');
+              }).length, label: 'OT Records', color: 'bg-rose-500' },
             ].map((d) => (
               <div key={d.dept} className="p-6 hover:bg-slate-50/50 transition-colors">
                 <div className="flex items-center gap-2 mb-3">
