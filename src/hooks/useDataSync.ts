@@ -20,7 +20,7 @@ export function useDataSync(fetchData: () => void | Promise<void>, deps: any[] =
     fetchRef.current();
   }, deps);
 
-  // Subcribe to local/remote real-time database change events.
+  // Subscribe to local/remote real-time database change events.
   useEffect(() => {
     const handleSync = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -28,9 +28,18 @@ export function useDataSync(fetchData: () => void | Promise<void>, deps: any[] =
       fetchRef.current();
     };
 
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key.startsWith('hms_')) {
+        console.log('useDataSync: Storage key updated in another tab/panel, refreshing:', event.key);
+        fetchRef.current();
+      }
+    };
+
     window.addEventListener('supabase-data-sync', handleSync);
+    window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener('supabase-data-sync', handleSync);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 }

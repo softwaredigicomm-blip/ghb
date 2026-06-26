@@ -672,45 +672,24 @@ export default function OPD() {
     if (synced) {
       setPatients([synced, ...patients]);
 
-      // Collect the checked fees dynamically
+      // Automatically charge standard OPD Registration Fee if greater than 0
       const selectedInvoiceItems: any[] = [];
       let calculatedTotal = 0;
 
-      if (selectedRegFees.reg.checked) {
+      const regFeeAmount = selectedRegFees.reg.amount;
+      if (regFeeAmount > 0) {
         selectedInvoiceItems.push({
           item_name: 'OPD Registration Fee',
           item_type: 'Consultation',
           quantity: 1,
-          unit_price: selectedRegFees.reg.amount,
-          total_price: selectedRegFees.reg.amount
+          unit_price: regFeeAmount,
+          total_price: regFeeAmount
         });
-        calculatedTotal += selectedRegFees.reg.amount;
-      }
-
-      if (selectedRegFees.appt.checked) {
-        selectedInvoiceItems.push({
-          item_name: 'Appointment Fee',
-          item_type: 'Consultation',
-          quantity: 1,
-          unit_price: selectedRegFees.appt.amount,
-          total_price: selectedRegFees.appt.amount
-        });
-        calculatedTotal += selectedRegFees.appt.amount;
-      }
-
-      if (selectedRegFees.consult.checked) {
-        selectedInvoiceItems.push({
-          item_name: 'Consultation Fee',
-          item_type: 'Consultation',
-          quantity: 1,
-          unit_price: selectedRegFees.consult.amount,
-          total_price: selectedRegFees.consult.amount
-        });
-        calculatedTotal += selectedRegFees.consult.amount;
+        calculatedTotal += regFeeAmount;
       }
 
       if (selectedInvoiceItems.length > 0) {
-        // Create Invoice for select applicable Fees
+        // Create Invoice for standard OPD registration fee
         const invoiceData = {
           patient_id: synced.id,
           invoice_number: `INV-REG-${Date.now()}`,
@@ -735,7 +714,20 @@ export default function OPD() {
       });
 
       setIsRegisterOpen(false);
-      setIsTokenSuccessOpen(true);
+      
+      // Redirect to Appointment immediately after registration
+      setNewAppointment({
+        patientId: synced.id,
+        doctor: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '',
+        urgency: 'Routine'
+      });
+      setPatientSearchTerm(synced.name);
+      setShowPatientResults(false);
+      setIsAppointmentOpen(true);
+      setActiveTab('appointments');
+
       playNotificationSound();
       // Reset form
       setNewPatient({ 
@@ -758,7 +750,7 @@ export default function OPD() {
         guardianName: '',
         urgency: 'Routine'
       });
-      toast.success('Patient registered and token generated');
+      toast.success('Patient registered and redirected to Appointment Booking');
     } else {
       toast.error('Failed to register patient');
     }
@@ -1746,113 +1738,7 @@ export default function OPD() {
                       />
                     </div>
 
-                    <div className="col-span-2 border-t border-slate-100 pt-4 mt-2">
-                      <Label className="text-xs font-black uppercase text-slate-500 tracking-wider">Applicable Fees / Charges Config</Label>
-                      <p className="text-[10px] text-muted-foreground mb-3">Select which fees to collect from this patient registration. Check to enable, and modify the amount if needed.</p>
-                      <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
-                        {/* Row 1: Reg Fee */}
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-2">
-                            <input 
-                              id="reg-fee-chk"
-                              type="checkbox" 
-                              checked={selectedRegFees.reg.checked}
-                              onChange={(e) => setSelectedRegFees({
-                                ...selectedRegFees, 
-                                reg: { ...selectedRegFees.reg, checked: e.target.checked }
-                              })}
-                              className="h-4 w-4 rounded border-slate-300 text-medical-blue focus:ring-medical-blue cursor-pointer"
-                            />
-                            <Label htmlFor="reg-fee-chk" className="text-xs font-black text-slate-700 cursor-pointer">OPD Registration Fee</Label>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-slate-400">₹</span>
-                            <Input 
-                              type="number"
-                              disabled={!selectedRegFees.reg.checked}
-                              value={selectedRegFees.reg.amount}
-                              onChange={(e) => setSelectedRegFees({
-                                ...selectedRegFees, 
-                                reg: { ...selectedRegFees.reg, amount: Number(e.target.value) }
-                              })}
-                              className="w-24 h-8 text-xs text-right font-bold bg-white"
-                            />
-                          </div>
-                        </div>
 
-                        {/* Row 2: Appt Fee */}
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-2">
-                            <input 
-                              id="appt-fee-chk"
-                              type="checkbox" 
-                              checked={selectedRegFees.appt.checked}
-                              onChange={(e) => setSelectedRegFees({
-                                ...selectedRegFees, 
-                                appt: { ...selectedRegFees.appt, checked: e.target.checked }
-                              })}
-                              className="h-4 w-4 rounded border-slate-300 text-medical-blue focus:ring-medical-blue cursor-pointer"
-                            />
-                            <Label htmlFor="appt-fee-chk" className="text-xs font-black text-slate-700 cursor-pointer">Appointment booking Fee</Label>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-slate-400">₹</span>
-                            <Input 
-                              type="number"
-                              disabled={!selectedRegFees.appt.checked}
-                              value={selectedRegFees.appt.amount}
-                              onChange={(e) => setSelectedRegFees({
-                                ...selectedRegFees, 
-                                appt: { ...selectedRegFees.appt, amount: Number(e.target.value) }
-                              })}
-                              className="w-24 h-8 text-xs text-right font-bold bg-white"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Row 3: Consult Fee */}
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-2">
-                            <input 
-                              id="consult-fee-chk"
-                              type="checkbox" 
-                              checked={selectedRegFees.consult.checked}
-                              onChange={(e) => setSelectedRegFees({
-                                ...selectedRegFees, 
-                                consult: { ...selectedRegFees.consult, checked: e.target.checked }
-                              })}
-                              className="h-4 w-4 rounded border-slate-300 text-medical-blue focus:ring-medical-blue cursor-pointer"
-                            />
-                            <Label htmlFor="consult-fee-chk" className="text-xs font-black text-slate-700 cursor-pointer">OPD Consultation Fee</Label>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-slate-400">₹</span>
-                            <Input 
-                              type="number"
-                              disabled={!selectedRegFees.consult.checked}
-                              value={selectedRegFees.consult.amount}
-                              onChange={(e) => setSelectedRegFees({
-                                ...selectedRegFees, 
-                                consult: { ...selectedRegFees.consult, amount: Number(e.target.value) }
-                              })}
-                              className="w-24 h-8 text-xs text-right font-bold bg-white"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Summary Total */}
-                        <div className="flex justify-between items-center border-t border-slate-200 mt-2 pt-2 text-xs font-black text-slate-700 uppercase tracking-widest">
-                          <span>Total Assigned Charges</span>
-                          <span className="text-medical-blue text-sm font-black">
-                            ₹{(
-                              (selectedRegFees.reg.checked ? selectedRegFees.reg.amount : 0) +
-                              (selectedRegFees.appt.checked ? selectedRegFees.appt.amount : 0) +
-                              (selectedRegFees.consult.checked ? selectedRegFees.consult.amount : 0)
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
                 <DialogFooter className="shrink-0 mt-auto pt-2 border-t">
