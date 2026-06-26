@@ -141,6 +141,31 @@ export const storage = {
   set: <T>(key: string, value: T): void => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      
+      if (typeof window !== 'undefined') {
+        // Dispatch custom event for same-tab reactive update
+        window.dispatchEvent(new CustomEvent('supabase-data-sync', {
+          detail: { table: key, action: 'update', local: true }
+        }));
+        
+        // Dispatch synthetic StorageEvent so same-tab listeners to 'storage' update instantly
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: key,
+          newValue: JSON.stringify(value),
+          storageArea: localStorage
+        }));
+
+        // Broadcast to other tabs/panels on the same device using BroadcastChannel
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            const channel = new BroadcastChannel('hms-local-sync');
+            channel.postMessage({ key, value });
+            channel.close();
+          } catch (e) {
+            console.warn('BroadcastChannel sync error:', e);
+          }
+        }
+      }
     } catch (error) {
       console.error(`Error writing storage key "${key}":`, error);
     }
@@ -148,6 +173,26 @@ export const storage = {
   remove: (key: string): void => {
     try {
       localStorage.removeItem(key);
+      
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('supabase-data-sync', {
+          detail: { table: key, action: 'delete', local: true }
+        }));
+        
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: key,
+          newValue: null,
+          storageArea: localStorage
+        }));
+
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            const channel = new BroadcastChannel('hms-local-sync');
+            channel.postMessage({ key, value: null });
+            channel.close();
+          } catch (e) {}
+        }
+      }
     } catch (error) {
       console.error(`Error removing storage key "${key}":`, error);
     }
@@ -155,6 +200,26 @@ export const storage = {
   clear: (): void => {
     try {
       localStorage.clear();
+      
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('supabase-data-sync', {
+          detail: { table: 'all', action: 'delete', local: true }
+        }));
+        
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: null,
+          newValue: null,
+          storageArea: localStorage
+        }));
+
+        if (typeof BroadcastChannel !== 'undefined') {
+          try {
+            const channel = new BroadcastChannel('hms-local-sync');
+            channel.postMessage({ key: 'all', value: null });
+            channel.close();
+          } catch (e) {}
+        }
+      }
     } catch (error) {
       console.error("Error clearing storage:", error);
     }

@@ -35,11 +35,32 @@ export function useDataSync(fetchData: () => void | Promise<void>, deps: any[] =
       }
     };
 
+    // Support standard BroadcastChannel for instant same-device cross-panel/tab synchronization
+    let localChannel: BroadcastChannel | null = null;
+    try {
+      if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+        localChannel = new BroadcastChannel('hms-local-sync');
+        localChannel.onmessage = (event) => {
+          if (event.data && event.data.key && event.data.key.startsWith('hms_')) {
+            console.log('useDataSync: Local BroadcastChannel sync received for key:', event.data.key);
+            fetchRef.current();
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('Failed to initialize local BroadcastChannel:', e);
+    }
+
     window.addEventListener('supabase-data-sync', handleSync);
     window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener('supabase-data-sync', handleSync);
       window.removeEventListener('storage', handleStorage);
+      if (localChannel) {
+        try {
+          localChannel.close();
+        } catch (e) {}
+      }
     };
   }, []);
 }

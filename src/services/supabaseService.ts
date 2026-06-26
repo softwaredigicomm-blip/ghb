@@ -3021,19 +3021,23 @@ const rawSupabaseService = {
   // Dashboard Stats
   getDashboardStats: async () => {
     try {
-      // Get counts from various tables
-      const { count: patientCount } = await supabase.from('patients').select('*', { count: 'exact', head: true });
-      const { count: appointmentCount } = await supabase.from('appointments').select('*', { count: 'exact', head: true });
-      const { count: admissionCount } = await supabase.from('admissions').select('*', { count: 'exact', head: true });
-      
-      // Get total revenue
-      const { data: revenueData } = await supabase.from('invoices').select('paid_amount');
-      const totalRevenue = revenueData?.reduce((sum, inv) => sum + (Number(inv.paid_amount) || 0), 0) || 0;
+      // Get counts and revenue concurrently to speed up execution and avoid timeouts
+      const [patientsRes, appointmentsRes, admissionsRes, revenueRes] = await Promise.all([
+        supabase.from('patients').select('*', { count: 'exact', head: true }).then(r => r, e => ({ count: null, error: e })),
+        supabase.from('appointments').select('*', { count: 'exact', head: true }).then(r => r, e => ({ count: null, error: e })),
+        supabase.from('admissions').select('*', { count: 'exact', head: true }).then(r => r, e => ({ count: null, error: e })),
+        supabase.from('invoices').select('paid_amount').then(r => r, e => ({ data: null, error: e }))
+      ]);
+
+      const patientCount = patientsRes?.count || 0;
+      const appointmentCount = appointmentsRes?.count || 0;
+      const admissionCount = admissionsRes?.count || 0;
+      const totalRevenue = revenueRes?.data?.reduce((sum: number, inv: any) => sum + (Number(inv.paid_amount) || 0), 0) || 0;
 
       return {
-        patientCount: patientCount || 0,
-        appointmentCount: appointmentCount || 0,
-        admissionCount: admissionCount || 0,
+        patientCount,
+        appointmentCount,
+        admissionCount,
         totalRevenue
       };
     } catch (error: any) {
@@ -4009,7 +4013,7 @@ for (const [key, value] of Object.entries(rawSupabaseService)) {
         }
 
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Mutation timed out")), 4000);
+          setTimeout(() => reject(new Error("Mutation timed out")), 8000);
         });
 
         try {
@@ -4078,7 +4082,7 @@ for (const [key, value] of Object.entries(rawSupabaseService)) {
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error("Database connection timed out"));
-          }, 3500);
+          }, 8000);
         });
 
         try {
