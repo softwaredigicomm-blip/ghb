@@ -155,7 +155,15 @@ export default function OPD() {
     guardianName: '',
     urgency: 'Routine'
   });
-  const [newAppointment, setNewAppointment] = useState({ patientId: '', doctor: '', date: '', time: '', urgency: 'Routine' });
+  const [newAppointment, setNewAppointment] = useState({ 
+    patientId: '', 
+    doctor: '', 
+    date: '', 
+    time: '', 
+    urgency: 'Routine',
+    discountAmount: '0',
+    discountGivenBy: ''
+  });
   const [patientSearchTerm, setPatientSearchTerm] = useState('');
   const [patientRecordsSearchQuery, setPatientRecordsSearchQuery] = useState('');
   const [showPatientResults, setShowPatientResults] = useState(false);
@@ -574,7 +582,9 @@ export default function OPD() {
       doctor: apt.doctor || 'Dr. Rajesh Sharma',
       date: apt.appointment_date ? apt.appointment_date.split('T')[0] : (apt.date || ''),
       time: apt.appointment_time || apt.time || '',
-      urgency: apt.urgency || 'Routine'
+      urgency: apt.urgency || 'Routine',
+      discountAmount: String(apt.discount_amount || apt.discountAmount || 0),
+      discountGivenBy: apt.discount_given_by || apt.discountGivenBy || ''
     });
     setIsAppointmentOpen(true);
   };
@@ -773,7 +783,9 @@ export default function OPD() {
         appointment_time: newAppointment.time || '10:00 AM',
         urgency: newAppointment.urgency,
         doctor: newAppointment.doctor,
-        fee: selectedDocObj && selectedDocObj.consultationFee ? Number(selectedDocObj.consultationFee) : appointmentFee
+        fee: selectedDocObj && selectedDocObj.consultationFee ? Number(selectedDocObj.consultationFee) : appointmentFee,
+        discount_amount: Number(newAppointment.discountAmount || 0),
+        discount_given_by: newAppointment.discountGivenBy || currentUser?.name || null
       };
 
       const result = await supabaseService.updateAppointment(editingAppointment.id, updatedData);
@@ -795,7 +807,7 @@ export default function OPD() {
         toast.success('Appointment updated successfully');
         setIsAppointmentOpen(false);
         setEditingAppointment(null);
-        setNewAppointment({ patientId: '', doctor: '', date: '', time: '', urgency: 'Routine' });
+        setNewAppointment({ patientId: '', doctor: '', date: '', time: '', urgency: 'Routine', discountAmount: '0', discountGivenBy: '' });
         window.dispatchEvent(new Event('storage'));
       } else {
         toast.error('Failed to update appointment');
@@ -816,7 +828,9 @@ export default function OPD() {
       status: 'Scheduled',
       urgency: newAppointment.urgency,
       doctor: newAppointment.doctor,
-      fee: selectedDocObj && selectedDocObj.consultationFee ? Number(selectedDocObj.consultationFee) : appointmentFee
+      fee: selectedDocObj && selectedDocObj.consultationFee ? Number(selectedDocObj.consultationFee) : appointmentFee,
+      discount_amount: Number(newAppointment.discountAmount || 0),
+      discount_given_by: newAppointment.discountGivenBy || currentUser?.name || null
     });
 
     if (synced) {
@@ -910,7 +924,7 @@ export default function OPD() {
       setIsAppointmentOpen(false);
       setIsTokenSuccessOpen(true);
       playNotificationSound();
-      setNewAppointment({ patientId: '', doctor: '', date: '', time: '', urgency: 'Routine' });
+      setNewAppointment({ patientId: '', doctor: '', date: '', time: '', urgency: 'Routine', discountAmount: '0', discountGivenBy: '' });
       toast.success('Appointment booked and token generated');
     } else {
       toast.error('Failed to book appointment');
@@ -1092,9 +1106,13 @@ export default function OPD() {
 
   const handleRefundAppointment = async (id: string) => {
     if (!window.confirm("Are you sure you want to refund this consultation fee? This will mark the transaction as Refunded.")) return;
-    const success = await supabaseService.updateAppointment(id, { payment_status: 'Refunded' });
+    const refundBy = currentUser?.name || 'Staff';
+    const success = await supabaseService.updateAppointment(id, { 
+      payment_status: 'Refunded',
+      refund_given_by: refundBy
+    });
     if (success) {
-      setAppointments(appointments.map(a => a.id === id ? { ...a, payment_status: 'Refunded' } : a));
+      setAppointments(appointments.map(a => a.id === id ? { ...a, payment_status: 'Refunded', refund_given_by: refundBy, refundGivenBy: refundBy } : a));
       
       try {
         const apt = appointments.find(a => a.id === id);
@@ -1538,7 +1556,51 @@ export default function OPD() {
                         )}
                       </span>
                     </div>
+
+                    {Number(newAppointment.discountAmount || 0) > 0 && (
+                      <div className="flex justify-between items-center text-xs font-black text-amber-600 uppercase tracking-widest mt-1">
+                        <span>Discount Applied</span>
+                        <span>-₹{Number(newAppointment.discountAmount || 0)}</span>
+                      </div>
+                    )}
+
+                    {Number(newAppointment.discountAmount || 0) > 0 && (
+                      <div className="flex justify-between items-center border-t border-dashed border-slate-300 text-xs font-black text-slate-800 uppercase tracking-widest mt-1 pt-1">
+                        <span>Net Total</span>
+                        <span className="text-emerald-600 font-extrabold text-sm">
+                          ₹{Math.max(0, (
+                            (selectedApptFees.reg.checked ? selectedApptFees.reg.amount : 0) +
+                            (selectedApptFees.appt.checked ? selectedApptFees.appt.amount : 0) +
+                            (selectedApptFees.consult.checked ? selectedApptFees.consult.amount : 0)
+                          ) - Number(newAppointment.discountAmount || 0))}
+                        </span>
+                      </div>
+                    )}
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4 border bg-amber-50/40 p-4 rounded-xl">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-amber-700 tracking-wider">Discount (₹)</Label>
+                      <Input 
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={newAppointment.discountAmount || '0'}
+                        onChange={(e) => setNewAppointment({...newAppointment, discountAmount: e.target.value})}
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-amber-700 tracking-wider">Authorized / Given By</Label>
+                      <Input 
+                        placeholder={currentUser?.name || "Select staff"}
+                        value={newAppointment.discountGivenBy}
+                        onChange={(e) => setNewAppointment({...newAppointment, discountGivenBy: e.target.value})}
+                        className="bg-white"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Label>Priority / Urgency</Label>
                     <Select 
@@ -2095,7 +2157,7 @@ export default function OPD() {
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              className="h-8 text-[10px] font-black uppercase tracking-wider text-rose-600 border-rose-100 hover:bg-rose-50 px-2"
+                              className="h-8 text-[10px] font-black uppercase tracking-wider text-emerald-600 border-emerald-100 hover:bg-emerald-50 bg-emerald-50/50 px-2"
                               onClick={() => handlePayAppointment(apt.id)}
                             >
                               Collect ₹{apt.fee || appointmentFee}

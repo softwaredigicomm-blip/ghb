@@ -67,6 +67,7 @@ export function OPDCollectionTab({
         fee: Number(apt.fee || 500),
         discountAmount: Number(apt.discount_amount || apt.discountAmount || 0),
         discountGivenBy: apt.discount_given_by || apt.discountGivenBy || null,
+        refundGivenBy: apt.refund_given_by || apt.refundGivenBy || null,
         paymentStatus: apt.payment_status || 'Pending'
       };
     });
@@ -394,16 +395,21 @@ export function OPDCollectionTab({
                           ₹{tx.paymentStatus === 'Refunded' ? 0 : (tx.fee - tx.discountAmount)}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-[9px] uppercase font-bold ${
-                              tx.paymentStatus === 'Refunded' 
-                                ? 'bg-amber-50 text-amber-600 hover:bg-amber-100 border-amber-200' 
-                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                            }`}
-                          >
-                            {tx.paymentStatus}
-                          </Badge>
+                          <div className="flex flex-col items-center justify-center">
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-[9px] uppercase font-bold ${
+                                tx.paymentStatus === 'Refunded' 
+                                  ? 'bg-amber-50 text-amber-600 hover:bg-amber-100 border-amber-200' 
+                                  : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {tx.paymentStatus}
+                            </Badge>
+                            {tx.paymentStatus === 'Refunded' && tx.refundGivenBy && (
+                              <span className="text-[8px] text-amber-600 leading-none mt-1">By: {tx.refundGivenBy}</span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

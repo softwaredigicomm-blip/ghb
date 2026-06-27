@@ -180,6 +180,26 @@ function cleanAppointmentForPostgres(apt: any) {
     urgencyVal = `${urgencyVal} [doc:${safeDocName}]`;
   }
 
+  // Encode discount amount
+  const discAmt = cleaned.discount_amount !== undefined ? cleaned.discount_amount : cleaned.discountAmount;
+  if (discAmt !== undefined && discAmt !== null && Number(discAmt) > 0) {
+    urgencyVal = `${urgencyVal} [disc:${Number(discAmt)}]`;
+  }
+
+  // Encode discount given by
+  const discBy = cleaned.discount_given_by !== undefined ? cleaned.discount_given_by : cleaned.discountGivenBy;
+  if (discBy) {
+    const safeDiscBy = String(discBy).replace(/[\[\]]/g, '');
+    urgencyVal = `${urgencyVal} [discby:${safeDiscBy}]`;
+  }
+
+  // Encode refund given by
+  const refBy = cleaned.refund_given_by !== undefined ? cleaned.refund_given_by : cleaned.refundGivenBy;
+  if (refBy) {
+    const safeRefBy = String(refBy).replace(/[\[\]]/g, '');
+    urgencyVal = `${urgencyVal} [refby:${safeRefBy}]`;
+  }
+
   cleaned.urgency = urgencyVal;
   
   // list of actual columns in supabase_schema.sql
@@ -202,6 +222,9 @@ function mapAppointmentFromPostgres(apt: any) {
   let type = 'OPD';
   let urgency = apt.urgency || 'Routine';
   let doctorNameParsed = '';
+  let discountAmountParsed = 0;
+  let discountGivenByParsed = '';
+  let refundGivenByParsed = '';
 
   // Parse [doc:...]
   if (urgency.includes('[doc:')) {
@@ -215,6 +238,42 @@ function mapAppointmentFromPostgres(apt: any) {
     urgency = urgency.replace(/\[doc:.*?\]/g, '').trim();
   }
 
+  // Parse [disc:...]
+  if (urgency.includes('[disc:')) {
+    const discParts = urgency.split('[disc:');
+    if (discParts.length > 1) {
+      const discSubParts = discParts[1].split(']');
+      if (discSubParts.length > 0) {
+        discountAmountParsed = Number(discSubParts[0].trim()) || 0;
+      }
+    }
+    urgency = urgency.replace(/\[disc:.*?\]/g, '').trim();
+  }
+
+  // Parse [discby:...]
+  if (urgency.includes('[discby:')) {
+    const discbyParts = urgency.split('[discby:');
+    if (discbyParts.length > 1) {
+      const discbySubParts = discbyParts[1].split(']');
+      if (discbySubParts.length > 0) {
+        discountGivenByParsed = discbySubParts[0].trim();
+      }
+    }
+    urgency = urgency.replace(/\[discby:.*?\]/g, '').trim();
+  }
+
+  // Parse [refby:...]
+  if (urgency.includes('[refby:')) {
+    const refbyParts = urgency.split('[refby:');
+    if (refbyParts.length > 1) {
+      const refbySubParts = refbyParts[1].split(']');
+      if (refbySubParts.length > 0) {
+        refundGivenByParsed = refbySubParts[0].trim();
+      }
+    }
+    urgency = urgency.replace(/\[refby:.*?\]/g, '').trim();
+  }
+
   // Parse [type]
   if (urgency.includes('[') && urgency.includes(']')) {
     const parts = urgency.split('[');
@@ -223,6 +282,19 @@ function mapAppointmentFromPostgres(apt: any) {
   }
   mapped.type = type;
   mapped.urgency = urgency;
+
+  mapped.discount_amount = discountAmountParsed;
+  mapped.discountAmount = discountAmountParsed;
+  
+  if (discountGivenByParsed) {
+    mapped.discount_given_by = discountGivenByParsed;
+    mapped.discountGivenBy = discountGivenByParsed;
+  }
+  
+  if (refundGivenByParsed) {
+    mapped.refund_given_by = refundGivenByParsed;
+    mapped.refundGivenBy = refundGivenByParsed;
+  }
 
   if (doctorNameParsed) {
     mapped.doctor = doctorNameParsed;
