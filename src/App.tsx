@@ -63,7 +63,7 @@ import PharmacyPOS from './components/PharmacyPOS';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MOCK_PATIENTS, MOCK_USERS } from './mockData';
 import { User as UserType } from './types';
-import { supabaseService } from '@/services/supabaseService';
+import { supabaseService, syncOfflineDataWithSupabase } from '@/services/supabaseService';
 
 const navItems = [
   { name: 'Dashboard', icon: LayoutDashboard, path: '/', roles: ['SUPER_ADMIN', 'DOCTOR', 'RECEPTIONIST', 'RECEPTION', 'FRONT_DESK', 'NURSE', 'LAB_STAFF', 'PHARMACIST', 'ACCOUNTANT', 'RADIOLOGIST'] },
@@ -506,6 +506,61 @@ export default function App() {
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
+
+  // Load hospital info and perform automatic offline sync on startup
+  useEffect(() => {
+    const initializeDatabase = async () => {
+      try {
+        // Fetch hospital info
+        const dbHospitalInfo = await supabaseService.getHospitalInfo();
+        if (dbHospitalInfo) {
+          storage.set(STORAGE_KEYS.HOSPITAL_INFO, dbHospitalInfo);
+          setHospitalInfo(dbHospitalInfo);
+        }
+      } catch (err) {
+        console.warn('Could not fetch hospital info from database:', err);
+      }
+
+      // Check offline records and sync them automatically!
+      try {
+        const patients = storage.get(STORAGE_KEYS.PATIENTS, []);
+        const offlinePatients = patients.filter((p: any) => p.id && String(p.id).startsWith('off-'));
+        const appointments = storage.get(STORAGE_KEYS.APPOINTMENTS, []);
+        const offlineAppointments = appointments.filter((a: any) => a.id && String(a.id).startsWith('off-'));
+        const admissions = storage.get('hms_admissions', []);
+        const offlineAdmissions = admissions.filter((ad: any) => ad.id && String(ad.id).startsWith('off-'));
+        const prescriptions = storage.get(STORAGE_KEYS.PRESCRIPTIONS, []);
+        const offlinePrescriptions = prescriptions.filter((rx: any) => rx.id && String(rx.id).startsWith('off-'));
+        const bills = storage.get(STORAGE_KEYS.BILLING, []);
+        const offlineInvoices = bills.filter((b: any) => b.id && String(b.id).startsWith('off-'));
+        
+        const hasOfflineData = (
+          offlinePatients.length > 0 || 
+          offlineAppointments.length > 0 || 
+          offlineAdmissions.length > 0 || 
+          offlinePrescriptions.length > 0 ||
+          offlineInvoices.length > 0
+        );
+
+        if (hasOfflineData) {
+          console.log('Detected offline unsynced data. Initializing auto-sync...');
+          const syncResult = await syncOfflineDataWithSupabase();
+          if (syncResult && syncResult.success && syncResult.syncCount > 0) {
+            console.log(`Auto-synchronized ${syncResult.syncCount} offline records to the cloud!`);
+            toast.success('Offline records synchronized with live server!');
+            // Dispatch sync event to refresh lists in active components
+            window.dispatchEvent(new CustomEvent('supabase-data-sync', { detail: { action: 'sync' } }));
+          }
+        }
+      } catch (err) {
+        console.warn('Silent auto-sync failure on load:', err);
+      }
+    };
+
+    if (isAuthenticated) {
+      initializeDatabase();
+    }
+  }, [isAuthenticated]);
 
   const handleLogout = () => {
     storage.remove(STORAGE_KEYS.AUTH_STATUS);

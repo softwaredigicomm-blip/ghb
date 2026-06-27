@@ -15,20 +15,16 @@ async function run() {
     return;
   }
   console.log('Current row:', hData);
-  if (hData && hData.length > 0) {
-    const id = hData[0].id;
-    console.log('Attempting to update registration_number to test large string on row', id);
-    const { data: updateData, error: updateErr } = await supabase
-      .from('hospital_info')
-      .update({ registration_number: 'TEST_BASE64_VALUE_VERY_LONG_STRING_HELLOWORLD'.repeat(100) })
-      .eq('id', id)
-      .select();
-    if (updateErr) {
-      console.error('Update error:', updateErr);
-    } else {
-      console.log('Update success!', updateData);
-    }
-  }
+  
+  console.log('Fetching patients count...');
+  const { data: pData, error: pErr } = await supabase.from('patients').select('*');
+  if (pErr) console.error('pErr:', pErr);
+  else console.log('Patients count in DB:', pData?.length);
+
+  console.log('Fetching invoices count...');
+  const { data: iData, error: iErr } = await supabase.from('invoices').select('*');
+  if (iErr) console.error('iErr:', iErr);
+  else console.log('Invoices count in DB:', iData?.length);
 }
 
 run();

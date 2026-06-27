@@ -3940,6 +3940,12 @@ function isNetworkFailure(err: any): boolean {
 export async function checkConnection(): Promise<boolean> {
   if (!isSupabaseConfigured) return false;
   
+  // Fast fail check using browser standard navigator.onLine API
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && navigator.onLine === false) {
+    supabaseUnreachable = true;
+    return false;
+  }
+  
   const now = Date.now();
   if (supabaseUnreachable && (now - lastCheckTime < CHECK_COOLDOWN_MS)) {
     return false;
@@ -3954,7 +3960,7 @@ export async function checkConnection(): Promise<boolean> {
     try {
       const rawPromise = supabase.from('hospital_info').select('id').limit(1);
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Network check timed out")), 1500);
+        setTimeout(() => reject(new Error("Network check timed out")), 5000);
       });
       await Promise.race([rawPromise, timeoutPromise]);
       supabaseUnreachable = false;
