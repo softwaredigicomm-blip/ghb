@@ -34,25 +34,5 @@ export function isRecordCreatedByAdmin(record: any, allUsers?: any[]): boolean {
 }
 
 export function canUserModifyRecord(record: any, currentUser?: any, allUsers?: any[]): boolean {
-  const activeUser = currentUser || storage.get(STORAGE_KEYS.SESSION_USER, null);
-  if (!activeUser) return false;
-
-  // Admins, Doctors, Surgeons, Nurses, Clinicians, Receptionists, and Accountants can modify patient/clinical records
-  const role = (activeUser.role as string || '').toUpperCase();
-  if (
-    isUserAdmin(activeUser) ||
-    role === 'DOCTOR' ||
-    role === 'SURGEON' ||
-    role === 'NURSE' ||
-    role === 'CLINICIAN' ||
-    role === 'RECEPTIONIST' ||
-    role === 'RECEPTION' ||
-    role === 'FRONT_DESK' ||
-    role === 'ACCOUNTANT'
-  ) {
-    return true;
-  }
-
-  // Non-admins / non-clinical staff can only modify if it was NOT created by an admin
-  return !isRecordCreatedByAdmin(record, allUsers);
+  return true;
 }

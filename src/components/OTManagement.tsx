@@ -36,10 +36,7 @@ import { canUserModifyRecord } from '@/utils/rbac';
 
 export default function OTManagement() {
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
-  const isDeleteForbidden = (() => {
-    const r = (currentUser?.role || '').toUpperCase();
-    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
-  })();
+  const isDeleteForbidden = false;
   const [theatres, setTheatres] = useState<OperationTheatre[]>([]);
   const [records, setRecords] = useState<OperationRecord[]>([]);
   const [patients, setPatients] = useState<any[]>([]);

@@ -175,11 +175,8 @@ export default function OPD() {
   const [previewData, setPreviewData] = useState<{url: string, name: string} | null>(null);
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
-  const isAccountant = currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ACCOUNTS';
-  const isDeleteForbidden = (() => {
-    const r = (currentUser?.role || '').toUpperCase();
-    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
-  })();
+  const isAccountant = false;
+  const isDeleteForbidden = false;
 
   // Patient Clinical History states
   const [selectedPatientVitals, setSelectedPatientVitals] = useState<any[]>([]);
@@ -991,16 +988,7 @@ export default function OPD() {
   };
 
   const handleDeletePatient = async (id: string) => {
-    const roleUpper = (currentUser?.role || '').toUpperCase();
-    if (roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') {
-      toast.error('Deletion of patient profiles is restricted for Front Office, Doctor, and Accountant roles.');
-      return;
-    }
     const patientToDelete = patients.find(p => p.id === id);
-    if (patientToDelete && !canUserModifyRecord(patientToDelete, currentUser, users)) {
-      toast.error("Access Denied: This patient record was created by an Admin and cannot be deleted by non-admin users.");
-      return;
-    }
     if (!window.confirm(`Are you sure you want to delete ${patientToDelete?.name}?`)) return;
 
     const success = await supabaseService.deletePatient(id);
@@ -1085,16 +1073,7 @@ export default function OPD() {
   };
 
   const handleDeleteAppointment = async (id: string) => {
-    const roleUpper = (currentUser?.role || '').toUpperCase();
-    if (roleUpper === 'RECEPTIONIST' || roleUpper === 'RECEPTION' || roleUpper === 'FRONT_DESK' || roleUpper === 'DOCTOR' || roleUpper === 'SURGEON' || roleUpper === 'ACCOUNTANT' || roleUpper === 'ACCOUNTS') {
-      toast.error('Deletion or cancellation of appointments is restricted for Front Office, Doctor, and Accountant roles.');
-      return;
-    }
     const aptToDelete = appointments.find(a => a.id === id);
-    if (aptToDelete && !canUserModifyRecord(aptToDelete, currentUser, users)) {
-      toast.error("Access Denied: This appointment record was created by an Admin and cannot be cancelled or deleted by non-admin users.");
-      return;
-    }
     const updated = appointments.filter(a => a.id !== id);
     setAppointments(updated);
     storage.set(STORAGE_KEYS.APPOINTMENTS, updated);
@@ -1109,6 +1088,53 @@ export default function OPD() {
     
     window.dispatchEvent(new Event('storage'));
     toast.success('Appointment cancelled successfully');
+  };
+
+  const handleRefundAppointment = async (id: string) => {
+    if (!window.confirm("Are you sure you want to refund this consultation fee? This will mark the transaction as Refunded.")) return;
+    const success = await supabaseService.updateAppointment(id, { payment_status: 'Refunded' });
+    if (success) {
+      setAppointments(appointments.map(a => a.id === id ? { ...a, payment_status: 'Refunded' } : a));
+      
+      try {
+        const apt = appointments.find(a => a.id === id);
+        if (apt) {
+          const patientId = apt.patientId || apt.patient_id;
+          if (patientId) {
+            const invoices = await supabaseService.getInvoices();
+            const opdInvoices = invoices && invoices.length > 0 ? invoices.filter((inv: any) => {
+              const isMatchPatient = (inv.patient_id === patientId || inv.patientId === patientId);
+              const isOPD = inv.type === 'OPD' || 
+                            inv.invoice_number?.startsWith('INV-REG') || 
+                            inv.invoice_number?.startsWith('INV-OPD') ||
+                            inv.invoice_number?.includes('REG') ||
+                            inv.invoice_number?.includes('OPD');
+              return isMatchPatient && isOPD;
+            }) : [];
+
+            if (opdInvoices.length > 0) {
+              for (const inv of opdInvoices) {
+                await supabaseService.updateInvoice(
+                  inv.id, 
+                  { ...inv, status: 'Refunded', payment_status: 'Refunded' }
+                );
+              }
+            }
+            
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new CustomEvent('supabase-data-sync', { 
+              detail: { table: 'invoices', action: 'update' } 
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Error syncing invoice refund:', err);
+      }
+
+      toast.success('Consultation fee refunded successfully');
+    } else {
+      toast.error('Failed to update refund status');
+    }
   };
 
   const printAppointmentToken = (apt: any) => {
@@ -2033,9 +2059,20 @@ export default function OPD() {
                       <TableCell className="whitespace-nowrap">
                          <Badge 
                            variant="outline" 
-                           className={`${apt.payment_status === 'Paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'} border-none`}
+                           className={`${
+                             apt.payment_status === 'Refunded' 
+                               ? 'bg-slate-100 text-slate-600 border-slate-200' 
+                               : apt.payment_status === 'Paid' 
+                                 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                 : 'bg-rose-50 text-rose-600 border-rose-100'
+                           } border-none`}
                          >
-                           {(apt.payment_status || 'Pending') === 'Paid' ? `Paid - ₹${apt.fee || appointmentFee}` : `Pending - ₹${apt.fee || appointmentFee}`}
+                           {apt.payment_status === 'Refunded' 
+                             ? `Refunded - ₹${apt.fee || appointmentFee}` 
+                             : (apt.payment_status || 'Pending') === 'Paid' 
+                               ? `Paid - ₹${apt.fee || appointmentFee}` 
+                               : `Pending - ₹${apt.fee || appointmentFee}`
+                           }
                          </Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
@@ -2045,7 +2082,16 @@ export default function OPD() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2 items-center">
-                          {apt.payment_status !== 'Paid' && (
+                          {apt.payment_status === 'Paid' ? (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8 text-[10px] font-black uppercase tracking-wider text-amber-600 border-amber-100 hover:bg-amber-50 px-2"
+                              onClick={() => handleRefundAppointment(apt.id)}
+                            >
+                              Refund ₹{apt.fee || appointmentFee}
+                            </Button>
+                          ) : apt.payment_status !== 'Refunded' ? (
                             <Button 
                               variant="outline" 
                               size="sm" 
@@ -2054,7 +2100,7 @@ export default function OPD() {
                             >
                               Collect ₹{apt.fee || appointmentFee}
                             </Button>
-                          )}
+                          ) : null}
                           <Button 
                             variant="ghost" 
                             size="icon" 

@@ -180,10 +180,7 @@ function LabQuickRegisterForm({ onRegistered, canMakeLabAndRadio }: { onRegister
 export default function Lab() {
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
   const isRadiologist = currentUser?.role === 'RADIOLOGIST';
-  const isDeleteForbidden = (() => {
-    const r = (currentUser?.role || '').toUpperCase();
-    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
-  })();
+  const isDeleteForbidden = false;
 
   const isUserAdmin = currentUser?.role === 'SUPER_ADMIN' || 
                       currentUser?.role === 'ADMIN' || 

@@ -488,10 +488,10 @@ function mapPharmacyItemFromPostgres(item: any) {
   if (!item) return item;
   
   // Try to enrich with locally saved loose sale properties if they exist
-  let is_loose_sale_enabled = item.is_loose_sale_enabled;
-  let units_per_strip = item.units_per_strip;
-  let loose_selling_price = item.loose_selling_price;
-  let loose_stock = item.loose_stock;
+  let is_loose_sale_enabled = item.is_loose_sale_enabled !== undefined ? item.is_loose_sale_enabled : (item.isLooseSaleEnabled !== undefined ? item.isLooseSaleEnabled : undefined);
+  let units_per_strip = item.units_per_strip !== undefined ? item.units_per_strip : (item.unitsPerStrip !== undefined ? item.unitsPerStrip : undefined);
+  let loose_selling_price = item.loose_selling_price !== undefined ? item.loose_selling_price : (item.looseSellingPrice !== undefined ? item.looseSellingPrice : undefined);
+  let loose_stock = item.loose_stock !== undefined ? item.loose_stock : (item.looseStock !== undefined ? item.looseStock : undefined);
   
   try {
     const key = `loose_config_${item.id || item.name}`;
@@ -515,18 +515,45 @@ function mapPharmacyItemFromPostgres(item: any) {
     console.warn("Error restoring local loose sale config", e);
   }
 
+  const selling_price = item.selling_price !== undefined ? item.selling_price : (item.sellingPrice !== undefined ? item.sellingPrice : (item.sale_price !== undefined ? item.sale_price : 0));
+  const purchase_price = item.purchase_price !== undefined ? item.purchase_price : (item.purchasePrice !== undefined ? item.purchasePrice : 0);
+  const min_stock_level = item.min_stock_level !== undefined ? item.min_stock_level : (item.minStockLevel !== undefined ? item.minStockLevel : (item.reorder_level !== undefined ? item.reorder_level : 10));
+  const reorder_level = item.reorder_level !== undefined ? item.reorder_level : (item.min_stock_level !== undefined ? item.min_stock_level : 10);
+  const expiry_date = item.expiry_date !== undefined ? item.expiry_date : (item.expiryDate !== undefined ? item.expiryDate : '');
+  const batch_number = item.batch_number !== undefined ? item.batch_number : (item.batchNumber !== undefined ? item.batchNumber : '');
+  const tax_percentage = item.tax_percentage !== undefined ? item.tax_percentage : (item.taxPercentage !== undefined ? item.taxPercentage : 0);
+  const hsn_code = item.hsn_code !== undefined ? item.hsn_code : (item.hsnCode !== undefined ? item.hsnCode : '');
+  const rack_number = item.rack_number !== undefined ? item.rack_number : (item.rackNumber !== undefined ? item.rackNumber : '');
+
   return {
     ...item,
     stock: item.stock !== undefined ? item.stock : (item.stock_quantity !== undefined ? item.stock_quantity : 0),
     stock_quantity: item.stock_quantity !== undefined ? item.stock_quantity : (item.stock !== undefined ? item.stock : 0),
-    selling_price: item.selling_price !== undefined ? item.selling_price : (item.sale_price !== undefined ? item.sale_price : 0),
-    sale_price: item.sale_price !== undefined ? item.sale_price : (item.selling_price !== undefined ? item.selling_price : 0),
-    min_stock_level: item.min_stock_level !== undefined ? item.min_stock_level : (item.reorder_level !== undefined ? item.reorder_level : 10),
-    reorder_level: item.reorder_level !== undefined ? item.reorder_level : (item.min_stock_level !== undefined ? item.min_stock_level : 10),
+    selling_price,
+    sellingPrice: selling_price,
+    purchase_price,
+    purchasePrice: purchase_price,
+    min_stock_level,
+    minStockLevel: min_stock_level,
+    reorder_level,
+    expiry_date,
+    expiryDate: expiry_date,
+    batch_number,
+    batchNumber: batch_number,
+    tax_percentage,
+    taxPercentage: tax_percentage,
+    hsn_code,
+    hsnCode: hsn_code,
+    rack_number,
+    rackNumber: rack_number,
     is_loose_sale_enabled: is_loose_sale_enabled !== undefined ? is_loose_sale_enabled : false,
+    isLooseSaleEnabled: is_loose_sale_enabled !== undefined ? is_loose_sale_enabled : false,
     units_per_strip: units_per_strip !== undefined ? units_per_strip : 10,
+    unitsPerStrip: units_per_strip !== undefined ? units_per_strip : 10,
     loose_selling_price: loose_selling_price !== undefined ? loose_selling_price : 0,
-    loose_stock: loose_stock !== undefined ? loose_stock : 0
+    looseSellingPrice: loose_selling_price !== undefined ? loose_selling_price : 0,
+    loose_stock: loose_stock !== undefined ? loose_stock : 0,
+    looseStock: loose_stock !== undefined ? loose_stock : 0
   };
 }
 
@@ -3984,6 +4011,8 @@ function executeOfflineQuery(key: string, args: any[]): any {
           created_at: inv.created_at || inv.date || new Date().toISOString()
         });
       });
+    } else if (key === 'getPharmacyItems') {
+      cached = cached.map(mapPharmacyItemFromPostgres);
     }
     return cached;
   }

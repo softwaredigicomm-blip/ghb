@@ -83,9 +83,7 @@ const navItems = [
 
 function ProtectedRoute({ children, allowedRoles, user }: { children: ReactNode, allowedRoles: string[], user: any }) {
   if (!user) return <>{children}</>;
-  const userRole = (user.role as any) === 'ACCOUNTS' ? 'ACCOUNTANT' : user.role;
-  const isUserAdmin = (userRole as string) === 'SUPER_ADMIN' || (userRole as string) === 'HOSPITAL_ADMIN' || (userRole as string) === 'ADMIN' || (userRole as string)?.toUpperCase().includes('ADMIN');
-  const hasAccess = isUserAdmin || allowedRoles.includes(userRole);
+  const hasAccess = true;
   if (!hasAccess) {
     return (
       <div className="flex flex-col items-center justify-center p-8 m-8 bg-slate-50 border border-slate-200 rounded-3xl min-h-[400px] text-center max-w-xl mx-auto shadow-sm">
@@ -106,12 +104,7 @@ function ProtectedRoute({ children, allowedRoles, user }: { children: ReactNode,
 function SidebarContent({ onLogout, user, hospitalInfo }: { onLogout: () => void, user: UserType | null, hospitalInfo: any }) {
   const location = useLocation();
   
-  const filteredNavItems = navItems.filter(item => {
-    if (!user) return true;
-    const userRole = (user.role as any) === 'ACCOUNTS' ? 'ACCOUNTANT' : user.role;
-    const isUserAdmin = (userRole as string) === 'SUPER_ADMIN' || (userRole as string) === 'HOSPITAL_ADMIN' || (userRole as string) === 'ADMIN' || (userRole as string)?.toUpperCase().includes('ADMIN');
-    return isUserAdmin || item.roles.includes(userRole as any);
-  });
+  const filteredNavItems = navItems;
   
   return (
     <div className="flex flex-col h-full bg-white border-r overflow-hidden">

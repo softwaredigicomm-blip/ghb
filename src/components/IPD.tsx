@@ -339,11 +339,8 @@ export default function IPD() {
 
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
   const isCurrentUserAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'HOSPITAL_ADMIN' || currentUser?.role === 'ADMIN' || currentUser?.role?.toUpperCase().includes('ADMIN');
-  const isAccountant = currentUser?.role === 'ACCOUNTANT' || currentUser?.role === 'ACCOUNTS';
-  const isDeleteForbidden = (() => {
-    const r = (currentUser?.role || '').toUpperCase();
-    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
-  })();
+  const isAccountant = false;
+  const isDeleteForbidden = false;
 
   // --- NEW WORKFLOWS STATE ---
   const [activeTab, setActiveTab] = useState<'registration' | 'beds' | 'surgery' | 'discharge'>('beds');

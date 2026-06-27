@@ -53,10 +53,7 @@ import { canUserModifyRecord } from '@/utils/rbac';
 
 export default function Maternity() {
   const currentUser = storage.get(STORAGE_KEYS.SESSION_USER, null);
-  const isDeleteForbidden = (() => {
-    const r = (currentUser?.role || '').toUpperCase();
-    return r === 'RECEPTIONIST' || r === 'RECEPTION' || r === 'FRONT_DESK' || r === 'DOCTOR' || r === 'SURGEON' || r === 'ACCOUNTANT' || r === 'ACCOUNTS';
-  })();
+  const isDeleteForbidden = false;
   const [patients, setPatients] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [newborns, setNewborns] = useState<any[]>([]);
