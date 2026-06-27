@@ -101,7 +101,15 @@ export default function OPD() {
     setIsAppointmentOpen(open);
     if (!open) {
       setEditingAppointment(null);
-      setNewAppointment({ patientId: '', doctor: '', date: '', time: '', urgency: 'Routine' });
+      setNewAppointment({ 
+        patientId: '', 
+        doctor: '', 
+        date: '', 
+        time: '', 
+        urgency: 'Routine',
+        discountAmount: '0',
+        discountGivenBy: ''
+      });
     }
   };
   const [isTokenSuccessOpen, setIsTokenSuccessOpen] = useState(false);
@@ -590,8 +598,8 @@ export default function OPD() {
   };
 
   const handleRegistration = async () => {
-    if (!newPatient.name || !newPatient.phone) {
-      toast.error('Please fill in required fields');
+    if (!newPatient.name) {
+      toast.error('Please enter the patient\'s Full Name');
       return;
     }
 
@@ -686,7 +694,7 @@ export default function OPD() {
       const selectedInvoiceItems: any[] = [];
       let calculatedTotal = 0;
 
-      const regFeeAmount = selectedRegFees.reg.amount;
+      const regFeeAmount = selectedRegFees?.reg?.amount || 0;
       if (regFeeAmount > 0) {
         selectedInvoiceItems.push({
           item_name: 'OPD Registration Fee',
@@ -731,12 +739,19 @@ export default function OPD() {
         doctor: '',
         date: new Date().toISOString().split('T')[0],
         time: '',
-        urgency: 'Routine'
+        urgency: 'Routine',
+        discountAmount: '0',
+        discountGivenBy: ''
       });
       setPatientSearchTerm(synced.name);
       setShowPatientResults(false);
-      setIsAppointmentOpen(true);
-      setActiveTab('appointments');
+      
+      // Wrap in setTimeout to ensure the first dialog fully finishes its close animation and focus release 
+      // before opening the Book New Appointment dialog
+      setTimeout(() => {
+        setIsAppointmentOpen(true);
+        setActiveTab('appointments');
+      }, 150);
 
       playNotificationSound();
       // Reset form
@@ -1594,7 +1609,7 @@ export default function OPD() {
                       <Label className="text-xs font-black uppercase text-amber-700 tracking-wider">Authorized / Given By</Label>
                       <Input 
                         placeholder={currentUser?.name || "Select staff"}
-                        value={newAppointment.discountGivenBy}
+                        value={newAppointment.discountGivenBy || ''}
                         onChange={(e) => setNewAppointment({...newAppointment, discountGivenBy: e.target.value})}
                         className="bg-white"
                       />
@@ -1649,7 +1664,7 @@ export default function OPD() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number *</Label>
+                      <Label htmlFor="phone">Phone Number</Label>
                       <Input 
                         id="phone" 
                         placeholder="Enter phone number" 
