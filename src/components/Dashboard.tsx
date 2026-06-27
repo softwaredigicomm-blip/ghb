@@ -529,6 +529,25 @@ export default function Dashboard() {
     );
   }
 
+  const userRole = (currentUser?.role || '').toUpperCase();
+  const getBannerTitle = () => {
+    if (userRole === 'DOCTOR' || userRole === 'SURGEON') return "Doctor Portal & Clinical Suite";
+    if (userRole === 'RECEPTIONIST' || userRole === 'RECEPTION' || userRole === 'FRONT_DESK') return "Reception Desk Control Center";
+    if (userRole === 'NURSE') return "Ward Nursing & Patient Care Panel";
+    if (userRole === 'ACCOUNTANT' || userRole === 'ACCOUNTS') return "Finance & Medical Accounts Ledger";
+    if (userRole === 'PHARMACIST') return "Pharmacy POS & Inventory Panel";
+    if (userRole === 'LAB_STAFF') return "Laboratory & Diagnostic Reports Console";
+    return "Global Hospital Analytics & Admin Panel";
+  };
+
+  const getBannerDescription = () => {
+    if (userRole === 'DOCTOR' || userRole === 'SURGEON') return `Welcome back, ${currentUser?.name || 'Doctor'}. Access your active appointments, write clinical prescriptions, view live wait times, and manage patient care.`;
+    if (userRole === 'RECEPTIONIST' || userRole === 'RECEPTION' || userRole === 'FRONT_DESK') return `Welcome back, ${currentUser?.name || 'Receptionist'}. Track live outpatient queues, register new admissions, check bed occupancy, and schedule surgical slots.`;
+    if (userRole === 'NURSE') return `Welcome back, ${currentUser?.name || 'Nurse'}. Coordinate inpatient care protocols, record vitals, check ward beds, and organize nurse tasks.`;
+    if (userRole === 'ACCOUNTANT' || userRole === 'ACCOUNTS') return `Welcome, ${currentUser?.name || 'Accountant'}. Review patient invoices, process transaction collections, track overall balance statements, and manage expenses.`;
+    return "Real-time ledger audits, live database monitoring, clinical admissions trackers, and hospital status controllers.";
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Dynamic, Vibrant, Richly Colored Banner Header */}
@@ -539,13 +558,13 @@ export default function Dashboard() {
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <span className="text-[10px] font-black tracking-widest bg-white/20 text-white px-3 py-1 rounded-full uppercase my-1 select-none w-fit">
-              ★ SYSTEM CONTROLLER ACTIVE
+              ★ {userRole ? userRole.replace('_', ' ') : 'SYSTEM'} PANEL ACTIVE
             </span>
             <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl text-white">
-              Global Hospital Analytics
+              {getBannerTitle()}
             </h1>
             <p className="text-indigo-100 text-sm font-medium max-w-xl">
-              Live updates across all panels, overall databases, pharmacies, clinical admissions, and real-time ledger audits.
+              {getBannerDescription()}
             </p>
           </div>
           

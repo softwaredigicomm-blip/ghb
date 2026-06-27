@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { OPDCollectionTab } from './OPDCollectionTab';
 import { 
   CreditCard, 
   Search, 
@@ -91,11 +92,12 @@ export default function Billing() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [invoicesData, patientsData, staffData, expensesData] = await Promise.all([
+    const [invoicesData, patientsData, staffData, expensesData, appointmentsData] = await Promise.all([
       supabaseService.getInvoices(),
       supabaseService.getPatients(),
       supabaseService.getStaff(),
-      supabaseService.getExpenses()
+      supabaseService.getExpenses(),
+      supabaseService.getAppointments ? supabaseService.getAppointments() : Promise.resolve([])
     ]);
 
     if (invoicesData) {
@@ -117,6 +119,7 @@ export default function Billing() {
     if (patientsData) setPatients(patientsData);
     if (staffData && staffData.length > 0) setUsers(staffData);
     if (expensesData) setExpenses(expensesData);
+    if (appointmentsData) setAppointments(appointmentsData);
     setLoading(false);
   };
 
@@ -170,8 +173,20 @@ export default function Billing() {
     storage.set(STORAGE_KEYS.AUDIT_LOGS, [newLog, ...logs]);
   };
 
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [opdStartDate, setOpdStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [opdEndDate, setOpdEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [opdDoctorFilter, setOpdDoctorFilter] = useState<string>('all');
+  
+  const [recentInvoicesStartDate, setRecentInvoicesStartDate] = useState<string>('');
+  const [recentInvoicesEndDate, setRecentInvoicesEndDate] = useState<string>('');
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'analytics' | 'recent' | 'consolidated'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'recent' | 'consolidated' | 'opd-collection'>('analytics');
   const [seeding, setSeeding] = useState(false);
 
   // Compute analytics dynamically
@@ -794,7 +809,18 @@ export default function Billing() {
       }
     }
     
-    return searchMatch && categoryMatch;
+    const billDateStr = bill.created_at || bill.date || '';
+    const billDate = billDateStr ? billDateStr.split('T')[0] : '';
+    
+    let dateRangeMatch = true;
+    if (recentInvoicesStartDate) {
+      dateRangeMatch = dateRangeMatch && billDate >= recentInvoicesStartDate;
+    }
+    if (recentInvoicesEndDate) {
+      dateRangeMatch = dateRangeMatch && billDate <= recentInvoicesEndDate;
+    }
+    
+    return searchMatch && categoryMatch && dateRangeMatch;
   });
 
   const groupedBillsByDate = bills.reduce((acc: Record<string, any[]>, bill) => {
@@ -2260,6 +2286,16 @@ export default function Billing() {
         >
           Patient Consolidated Ledger (Date-wise)
         </button>
+        <button
+          className={`px-6 py-2.5 text-xs font-bold border-b-2 transition-all ${
+            activeTab === 'opd-collection' 
+              ? 'border-medical-blue text-medical-blue font-black bg-blue-50/40 rounded-t-lg' 
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+          onClick={() => setActiveTab('opd-collection')}
+        >
+          📁 OPD Collection & Doctor Statements
+        </button>
       </div>
 
       {activeTab === 'analytics' && (
@@ -2551,12 +2587,12 @@ export default function Billing() {
         </div>
       )}
 
-      {activeTab === 'recent' ? (
+      {activeTab === 'recent' && (
         <Card className="border-none shadow-sm rounded-t-none">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="text-lg">Recent Invoices</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative w-64">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-56">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search name, MRN, phone..." 
@@ -2566,7 +2602,7 @@ export default function Billing() {
                 />
               </div>
               <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-[140px] h-9 bg-white border-slate-200">
+                <SelectTrigger className="w-[130px] h-9 bg-white border-slate-200">
                   <div className="flex items-center gap-2">
                     <Filter className="w-3.5 h-3.5 text-muted-foreground" />
                     <SelectValue placeholder="Category" />
@@ -2584,6 +2620,37 @@ export default function Billing() {
                   <SelectItem value="expenses">Facility Expenses</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Date Filters */}
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 h-9">
+                <span className="text-[9px] uppercase font-bold text-muted-foreground px-1">From:</span>
+                <Input 
+                  type="date" 
+                  value={recentInvoicesStartDate}
+                  onChange={(e) => setRecentInvoicesStartDate(e.target.value)}
+                  className="h-7 w-28 text-[11px] border-none bg-transparent font-bold p-0 focus-visible:ring-0"
+                />
+                <span className="text-[9px] uppercase font-bold text-muted-foreground px-1">To:</span>
+                <Input 
+                  type="date" 
+                  value={recentInvoicesEndDate}
+                  onChange={(e) => setRecentInvoicesEndDate(e.target.value)}
+                  className="h-7 w-28 text-[11px] border-none bg-transparent font-bold p-0 focus-visible:ring-0"
+                />
+                {(recentInvoicesStartDate || recentInvoicesEndDate) && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 px-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-50 text-[10px] uppercase font-bold"
+                    onClick={() => {
+                      setRecentInvoicesStartDate('');
+                      setRecentInvoicesEndDate('');
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -2751,7 +2818,9 @@ export default function Billing() {
             </div>
           </CardContent>
         </Card>
-      ) : (
+      )}
+
+      {activeTab === 'consolidated' && (
         <Card className="border-none shadow-sm rounded-t-none">
           <CardHeader>
             <CardTitle className="text-base font-bold text-slate-800">Select Patient for Consolidated Date-wise Statement</CardTitle>
@@ -3024,6 +3093,21 @@ export default function Billing() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {activeTab === 'opd-collection' && (
+        <OPDCollectionTab 
+          bills={bills} 
+          appointments={appointments} 
+          patients={patients} 
+          users={users} 
+          opdStartDate={opdStartDate}
+          setOpdStartDate={setOpdStartDate}
+          opdEndDate={opdEndDate}
+          setOpdEndDate={setOpdEndDate}
+          opdDoctorFilter={opdDoctorFilter}
+          setOpdDoctorFilter={setOpdDoctorFilter}
+        />
       )}
     </div>
   );
