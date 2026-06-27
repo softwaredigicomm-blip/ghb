@@ -2078,6 +2078,7 @@ export default function OPD() {
                     <TableHead className="whitespace-nowrap">Token</TableHead>
                     <TableHead className="whitespace-nowrap">Patient</TableHead>
                     <TableHead className="whitespace-nowrap">Doctor</TableHead>
+                    <TableHead className="whitespace-nowrap">Department</TableHead>
                     <TableHead className="whitespace-nowrap">Time</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
                     <TableHead className="whitespace-nowrap">Payment</TableHead>
@@ -2122,6 +2123,11 @@ export default function OPD() {
                         </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{apt.doctor || apt.doctorName || 'Duty Doctor'}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <span className="text-xs font-medium text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                          {users.find(u => u.name === (apt.doctor || apt.doctorName) || u.id === apt.doctor_id)?.department || apt.doctorDepartment || 'General Medicine'}
+                        </span>
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <div className="flex items-center gap-1 text-xs">
                           <Clock className="w-3 h-3 text-muted-foreground" />

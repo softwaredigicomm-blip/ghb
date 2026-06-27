@@ -949,10 +949,26 @@ const rawSupabaseService = {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return (data || []).map(normalizePatient);
+      const normalized = (data || []).map(normalizePatient);
+      return normalized.filter((p: any) => 
+        p.id !== 'p1' && 
+        p.id !== 'p2' && 
+        p.name !== 'Amit Patel' && 
+        p.name !== 'Priya Singh' && 
+        p.phone !== '9876543210' && 
+        p.phone !== '9123456789'
+      );
     } catch (error: any) {
       console.warn('Error fetching patients, falling back to local storage:', error.message);
-      return (storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS) || []).map(normalizePatient);
+      const fallback = (storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS) || []).map(normalizePatient);
+      return fallback.filter((p: any) => 
+        p.id !== 'p1' && 
+        p.id !== 'p2' && 
+        p.name !== 'Amit Patel' && 
+        p.name !== 'Priya Singh' && 
+        p.phone !== '9876543210' && 
+        p.phone !== '9123456789'
+      );
     }
   },
 

@@ -4,29 +4,18 @@ export const MOCK_USERS: User[] = [
   { id: 'u2', name: 'Admin', email: 'admin@hospital.com', role: 'SUPER_ADMIN', department: 'Cardiology', specialization: 'Interventional Cardiology', degree: 'MD, DM (Cardiology)', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Anjali' }
 ];
 
-export const MOCK_PATIENTS: Patient[] = [
-  { id: 'p1', mrn: 'MRN-001', name: 'Amit Patel', age: 28, gender: 'Male', phone: '9876543210', address: 'B-42, Sector 15, Noida', bloodGroup: 'A+', status: 'Active', lastVisit: '2024-03-20', fatherName: 'Rajesh Patel', guardianName: 'Rajesh Patel', dob: '1996-05-15', attendingDoctorId: 'u1' },
-  { id: 'p2', mrn: 'MRN-002', name: 'Priya Singh', age: 45, gender: 'Female', phone: '9123456789', address: 'Flat 201, Green View, Mumbai', bloodGroup: 'O-', status: 'High Risk', lastVisit: '2024-03-25', husbandName: 'Vikram Singh', guardianName: 'Vikram Singh', dob: '1979-11-10', attendingDoctorId: 'u2' },
-];
+export const MOCK_PATIENTS: Patient[] = [];
 
 export const MOCK_BEDS: Bed[] = [
-  { id: 'b1', number: '101', ward: 'General Ward A', type: 'General', status: 'Occupied', patientId: 'p2' },
+  { id: 'b1', number: '101', ward: 'General Ward A', type: 'General', status: 'Available' },
   { id: 'b2', number: '102', ward: 'General Ward A', type: 'General', status: 'Available' },
   { id: 'b3', number: '201', ward: 'ICU', type: 'ICU', status: 'Available' },
   { id: 'b4', number: 'M1', ward: 'Maternity', type: 'Maternity', status: 'Available' },
 ];
 
-export const MOCK_APPOINTMENTS: Appointment[] = [
-  { id: 'a1', patientId: 'p1', doctorId: 'u1', date: '2024-04-10', time: '10:00 AM', type: 'OPD', status: 'Scheduled' },
-];
+export const MOCK_APPOINTMENTS: Appointment[] = [];
 
-export const MOCK_BILLING: BillingRecord[] = [
-  { id: 'bill1', patientId: 'p1', date: '2026-04-17', items: [{ description: 'Consultation Fee', amount: 500, category: 'OPD' }], totalAmount: 500, paidAmount: 500, status: 'Paid', paymentMode: 'Cash' },
-  { id: 'bill2', patientId: 'p2', date: '2026-04-16', items: [{ description: 'Room Charges (Semi-Private)', amount: 3000, category: 'IPD' }], totalAmount: 3000, paidAmount: 3000, status: 'Paid', paymentMode: 'UPI' },
-  { id: 'bill3', patientId: 'p1', date: '2026-03-10', items: [{ description: 'Lab Tests', amount: 2500, category: 'Lab' }], totalAmount: 2500, paidAmount: 2500, status: 'Paid', paymentMode: 'Card' },
-  { id: 'bill4', patientId: 'p2', date: '2026-01-15', items: [{ description: 'Surgery Fee', amount: 45000, category: 'IPD' }], totalAmount: 45000, paidAmount: 20000, status: 'Partial', paymentMode: 'Cash' },
-  { id: 'bill5', patientId: 'p1', date: '2025-11-20', items: [{ description: 'Follow-up', amount: 300, category: 'OPD' }], totalAmount: 300, paidAmount: 300, status: 'Paid', paymentMode: 'UPI' },
-];
+export const MOCK_BILLING: BillingRecord[] = [];
 
 export const MOCK_INVENTORY: InventoryItem[] = [
   { 
@@ -109,77 +98,20 @@ export const MOCK_THEATRES: OperationTheatre[] = [
   { id: 'ot3', name: 'OT-03 (Minor)', status: 'Maintenance', type: 'Minor' },
 ];
 
-export const MOCK_OPERATION_RECORDS: OperationRecord[] = [
-  {
-    id: 'op1',
-    patientId: 'p2',
-    theatreId: 'ot2',
-    surgeonId: 'u1',
-    operationName: 'Appendectomy',
-    date: '2024-04-11',
-    startTime: '09:00 AM',
-    status: 'In-Progress',
-    documents: [
-      { id: 'd1', name: 'Pre-op Consent', url: '#', type: 'Document', uploadedAt: '2024-04-11T08:30:00Z', uploadedBy: 'u1' },
-      { id: 'd2', name: 'Initial Incision', url: 'https://picsum.photos/seed/surgery1/800/600', type: 'Photo', uploadedAt: '2024-04-11T09:15:00Z', uploadedBy: 'u1' }
-    ]
-  }
-];
+export const MOCK_OPERATION_RECORDS: OperationRecord[] = [];
 
-export const MOCK_NURSING_TASKS: NursingTask[] = [
-  { id: 'nt1', patientId: 'p1', description: 'Administer Paracetamol', dueTime: '10:00 AM', status: 'Pending', priority: 'High' },
-  { id: 'nt2', patientId: 'p2', description: 'Change Dressing', dueTime: '11:30 AM', status: 'Pending', priority: 'Medium' },
-];
+export const MOCK_NURSING_TASKS: NursingTask[] = [];
 
 export const MOCK_NURSE_SHIFTS: NurseShift[] = [
   { id: 'ns1', nurseId: 'u3', shiftType: 'Morning', ward: 'General Ward A', status: 'Active' },
   { id: 'ns2', nurseId: 'u1', shiftType: 'Morning', ward: 'ICU', status: 'Active' },
 ];
 
-export const MOCK_PATIENT_VITALS: PatientVitals[] = [
-  { patientId: 'p1', bp: '120/80', pulse: 78, temp: '98.6°F', spo2: 96, lastUpdated: '2024-04-11T09:00:00Z' },
-  { patientId: 'p2', bp: '110/70', pulse: 82, temp: '99.1°F', spo2: 95, lastUpdated: '2024-04-11T09:15:00Z' },
-];
+export const MOCK_PATIENT_VITALS: PatientVitals[] = [];
 
-export const MOCK_PRESCRIPTIONS: Prescription[] = [
-  {
-    id: 'rx1',
-    patientId: 'p1',
-    doctorId: 'u1',
-    date: '2024-04-10',
-    medicines: [
-      { name: 'Paracetamol', dosage: '500mg', frequency: '1-0-1', duration: '5 days' }
-    ],
-    notes: 'Take after meals'
-  }
-];
+export const MOCK_PRESCRIPTIONS: Prescription[] = [];
 
 export const MOCK_PHARMACY_BILLING: BillingRecord[] = [
-  { 
-    id: 'ph-bill1', 
-    patientId: 'p1', 
-    date: '2026-04-17', 
-    items: [
-      { description: 'Paracetamol 500mg (10 tabs)', amount: 120, category: 'Pharmacy' },
-      { description: 'Cough Syrup', amount: 85, category: 'Pharmacy' }
-    ], 
-    totalAmount: 205, 
-    paidAmount: 205, 
-    status: 'Paid', 
-    paymentMode: 'UPI' 
-  },
-  { 
-    id: 'ph-bill2', 
-    patientId: 'p2', 
-    date: '2026-04-10', 
-    items: [
-      { description: 'Antibiotics Course', amount: 450, category: 'Pharmacy' }
-    ], 
-    totalAmount: 450, 
-    paidAmount: 450, 
-    status: 'Paid', 
-    paymentMode: 'Cash' 
-  },
   { 
     id: 'ph-bill3', 
     patientId: 'walk-in', 
