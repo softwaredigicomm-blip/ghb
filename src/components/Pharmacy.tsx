@@ -115,7 +115,9 @@ export default function Pharmacy() {
   };
 
   const fetchData = async () => {
-    setLoading(true);
+    if (inventory.length === 0) {
+      setLoading(true);
+    }
     const [invData, invoicesData, patientsData, dbSettings] = await Promise.all([
       supabaseService.getPharmacyItems(),
       supabaseService.getInvoices(),
@@ -128,7 +130,10 @@ export default function Pharmacy() {
     if (patientsData) setPatients(patientsData);
     if (dbSettings) {
       setPharmacySettings(dbSettings);
-      storage.set('hms_pharmacy_settings', dbSettings);
+      const currentSettings = storage.get('hms_pharmacy_settings', null);
+      if (JSON.stringify(currentSettings) !== JSON.stringify(dbSettings)) {
+        storage.set('hms_pharmacy_settings', dbSettings);
+      }
     }
     setLoading(false);
   };

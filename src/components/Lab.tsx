@@ -525,7 +525,10 @@ export default function Lab() {
   const [paymentMode, setPaymentMode] = useState('cash');
 
   useEffect(() => {
-    storage.set(STORAGE_KEYS.LAB_BILLS, bills);
+    const current = storage.get(STORAGE_KEYS.LAB_BILLS, null);
+    if (JSON.stringify(current) !== JSON.stringify(bills)) {
+      storage.set(STORAGE_KEYS.LAB_BILLS, bills);
+    }
   }, [bills]);
 
   useEffect(() => {

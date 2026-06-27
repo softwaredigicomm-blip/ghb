@@ -273,7 +273,10 @@ export default function OPD() {
   }, [isAppointmentOpen]);
 
   useEffect(() => {
-    storage.set('hms_prescriptions', savedPrescriptions);
+    const current = storage.get('hms_prescriptions', null);
+    if (JSON.stringify(current) !== JSON.stringify(savedPrescriptions)) {
+      storage.set('hms_prescriptions', savedPrescriptions);
+    }
   }, [savedPrescriptions]);
 
   useEffect(() => {

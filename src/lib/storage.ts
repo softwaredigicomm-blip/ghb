@@ -140,7 +140,12 @@ export const storage = {
   },
   set: <T>(key: string, value: T): void => {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      const stringifiedValue = JSON.stringify(value);
+      const existing = localStorage.getItem(key);
+      if (existing === stringifiedValue) {
+        return; // Avoid redundant writes and infinite render/sync loops!
+      }
+      localStorage.setItem(key, stringifiedValue);
       
       if (typeof window !== 'undefined') {
         // Dispatch custom event for same-tab reactive update
@@ -151,7 +156,7 @@ export const storage = {
         // Dispatch synthetic StorageEvent so same-tab listeners to 'storage' update instantly
         window.dispatchEvent(new StorageEvent('storage', {
           key: key,
-          newValue: JSON.stringify(value),
+          newValue: stringifiedValue,
           storageArea: localStorage
         }));
 
