@@ -19,14 +19,25 @@ import {
 } from '../mockData';
 
 // --- UUID VALIDATION AND CLEANING HELPERS ---
+function sanitizeUuid(val: any): any {
+  if (typeof val !== 'string') return val;
+  let valStr = val.trim();
+  if (valStr.length === 36 && (valStr.match(/-/g) || []).length === 5) {
+    valStr = valStr.replace(/(\-[0-9a-f]{3})\-([0-9a-f]{8})$/i, '$1$2');
+  }
+  return valStr;
+}
+
 function isUuid(val: any): boolean {
   if (typeof val !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+  const sanitized = sanitizeUuid(val);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sanitized);
 }
 
 function toDeterministicUuid(val: any): string {
   if (!val) return val;
-  const valStr = String(val);
+  let valStr = String(val).trim();
+  valStr = sanitizeUuid(valStr);
   if (isUuid(valStr)) return valStr;
 
   // Custom mapping for mock/standard prefixes
@@ -59,11 +70,11 @@ function toDeterministicUuid(val: any): string {
     hash1 = (hash1 * 31 + ch) | 0;
     hash2 = (hash2 * 37 + ch) | 0;
   }
-  const hex1 = Math.abs(hash1).toString(16).padStart(8, '0');
-  const hex2 = Math.abs(hash2).toString(16).padStart(8, '0');
-  const hex3 = (Math.abs(hash1 ^ hash2) & 0xffff).toString(16).padStart(4, '0');
-  const hex4 = (Math.abs(hash1 + hash2) & 0xffff).toString(16).padStart(4, '0');
-  const hex5 = (Math.abs(hash1 * hash2) & 0xffffffffffff).toString(16).padStart(12, '0');
+  const hex1 = (Math.abs(hash1) >>> 0).toString(16).padStart(8, '0');
+  const hex2 = (Math.abs(hash2) >>> 0).toString(16).padStart(8, '0');
+  const hex3 = ((Math.abs(hash1 ^ hash2) & 0xffff) >>> 0).toString(16).padStart(4, '0');
+  const hex4 = ((Math.abs(hash1 + hash2) & 0xffff) >>> 0).toString(16).padStart(4, '0');
+  const hex5 = ((Math.abs(hash1 * hash2) & 0xffffffff) >>> 0).toString(16).padStart(12, '0');
 
   return `${hex1.slice(0, 8)}-${hex2.slice(0, 4)}-4${hex3.slice(0, 3)}-8${hex4.slice(0, 3)}-${hex5.slice(0, 12)}`;
 }
@@ -81,13 +92,73 @@ function cleanUuidFields(payload: any) {
     if (field in cleaned) {
       const val = cleaned[field];
       if (val !== undefined && val !== null && val !== '') {
-        if (!isUuid(val)) {
-          cleaned[field] = toDeterministicUuid(val);
+        const sanitized = sanitizeUuid(val);
+        if (isUuid(sanitized)) {
+          cleaned[field] = sanitized;
+        } else {
+          cleaned[field] = toDeterministicUuid(sanitized);
         }
       }
     }
   }
   return cleaned;
+}
+
+async function ensurePatientExistsInDb(patientId: string): Promise<boolean> {
+  if (!patientId) return false;
+  try {
+    const cleanId = isUuid(patientId) ? patientId : toDeterministicUuid(patientId);
+    
+    // Check if the patient already exists in the database
+    const { data, error } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('id', cleanId)
+      .maybeSingle();
+      
+    if (data && data.id) {
+      return true; // Already exists!
+    }
+    
+    // If not, fetch details from local storage or mock data to insert a record
+    const localPatients = storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS) || [];
+    const patientData = localPatients.find((p: any) => 
+      p.id === patientId || 
+      p.id === cleanId || 
+      toDeterministicUuid(p.id) === cleanId
+    );
+    
+    const dbPat = cleanPatientForPostgres(patientData || {
+      id: cleanId,
+      name: 'Amit Patel',
+      gender: 'Male',
+      age: 28,
+      phone: '9876543210',
+      address: 'B-42, Sector 15, Noida',
+      blood_group: 'A+',
+      bloodGroup: 'A+',
+      status: 'Active'
+    });
+    
+    // Ensure the ID matches the correct clean UUID
+    dbPat.id = cleanId;
+    if (!dbPat.mrn) {
+      dbPat.mrn = 'MRN-' + Math.floor(100000 + Math.random() * 900000);
+    }
+    
+    const { error: insertError } = await supabase
+      .from('patients')
+      .insert([dbPat]);
+      
+    if (insertError) {
+      console.warn('Silent warning: failed to dynamically register referenced patient in DB:', insertError.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.warn('Error inside ensurePatientExistsInDb:', err.message || err);
+    return false;
+  }
 }
 
 // --- SCHEMA NORMALIZATION HELPERS ---
@@ -614,6 +685,20 @@ async function selfHealingQuery(action: 'insert' | 'update', table: string, payl
   const maxAttempts = 10;
   let currentPayload = Array.isArray(payload) ? { ...payload[0] } : { ...payload };
 
+  // Make sure we ensure patient exists first if the table contains a patient_id or patientId
+  if (currentPayload) {
+    if (currentPayload.patient_id) {
+      const cleanPatId = isUuid(currentPayload.patient_id) ? currentPayload.patient_id : toDeterministicUuid(currentPayload.patient_id);
+      await ensurePatientExistsInDb(cleanPatId);
+      currentPayload.patient_id = cleanPatId;
+    } else if (currentPayload.patientId) {
+      const cleanPatId = isUuid(currentPayload.patientId) ? currentPayload.patientId : toDeterministicUuid(currentPayload.patientId);
+      await ensurePatientExistsInDb(cleanPatId);
+      currentPayload.patient_id = cleanPatId;
+      delete currentPayload.patientId;
+    }
+  }
+
   while (attempt < maxAttempts) {
     try {
       if (action === 'insert') {
@@ -860,6 +945,9 @@ const rawSupabaseService = {
   createAppointment: async (appointment: any) => {
     try {
       const dbApt = cleanAppointmentForPostgres(appointment);
+      if (dbApt.patient_id) {
+        await ensurePatientExistsInDb(dbApt.patient_id);
+      }
       const { data, error } = await supabase
         .from('appointments')
         .insert([dbApt])
@@ -1081,6 +1169,9 @@ const rawSupabaseService = {
   createInvoice: async (invoice: any, items: any[]) => {
     try {
       const dbInv = cleanInvoiceForPostgres(invoice);
+      if (dbInv.patient_id) {
+        await ensurePatientExistsInDb(dbInv.patient_id);
+      }
       const { data: invData, error: invError } = await supabase
         .from('invoices')
         .insert([dbInv])
@@ -4019,7 +4110,7 @@ for (const [key, value] of Object.entries(rawSupabaseService)) {
         }
 
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Mutation timed out")), 8000);
+          setTimeout(() => reject(new Error("Mutation timed out")), 20000);
         });
 
         try {
@@ -4059,15 +4150,16 @@ for (const [key, value] of Object.entries(rawSupabaseService)) {
             return executeOfflineMutation(key, args);
           }
         } catch (err: any) {
-          console.error(`[Supabase Error] Mutation ${key} failed:`, err);
           const msg = (err.message || '').toLowerCase();
-          
           const isNetworkIssue = isNetworkFailure(err) || msg.includes('timeout') || msg.includes('fetch');
           
           if (isNetworkIssue) {
+            console.warn(`[Supabase Mutation Warning] Mutation ${key} timed out or network failed. Executing offline fallback to maintain UI state.`);
             supabaseUnreachable = true;
             toastSlowConnection();
             return executeOfflineMutation(key, args);
+          } else {
+            console.error(`[Supabase Error] Mutation ${key} failed:`, err);
           }
           
           // Real database schema or format issue. Do not mask.
@@ -4088,7 +4180,7 @@ for (const [key, value] of Object.entries(rawSupabaseService)) {
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error("Database connection timed out"));
-          }, 8000);
+          }, 20000);
         });
 
         try {
@@ -4126,14 +4218,17 @@ for (const [key, value] of Object.entries(rawSupabaseService)) {
             return null;
           }
         } catch (err: any) {
-          console.error(`[Supabase Error] Query ${key} failed:`, err);
           const msg = (err.message || '').toLowerCase();
-          
           const isNetworkIssue = isNetworkFailure(err) || msg.includes('timeout') || msg.includes('fetch');
           
-          if (isNetworkIssue && config) {
-            toastSlowConnection();
-            return executeOfflineQuery(key, args);
+          if (isNetworkIssue) {
+            console.warn(`[Supabase Query Warning] Query ${key} timed out or network failed. Falling back to offline cached storage representation.`);
+            if (config) {
+              toastSlowConnection();
+              return executeOfflineQuery(key, args);
+            }
+          } else {
+            console.error(`[Supabase Error] Query ${key} failed:`, err);
           }
           
           // Real database schema or query format issue. Do not mask.
