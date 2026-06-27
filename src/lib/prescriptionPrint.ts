@@ -104,11 +104,11 @@ export function getPrescriptionPrintHtml(
       <head>
         <title>Prescription - ${patName}</title>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap');
           
           @page {
             size: A4;
-            margin: 15mm 15mm 18mm 15mm;
+            margin: 15mm 15mm 15mm 15mm;
           }
           body {
             font-family: 'Plus Jakarta Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -130,7 +130,7 @@ export function getPrescriptionPrintHtml(
           }
           .container {
             width: 100%;
-            min-height: 250mm;
+            min-height: 260mm;
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
@@ -141,108 +141,6 @@ export function getPrescriptionPrintHtml(
           .header {
             display: ${isValidTemplateImage ? 'none' : 'block'};
             margin-bottom: 22px;
-          }
-          .header-grid {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-          }
-          .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-          }
-          .hosp-icon {
-            width: 48px;
-            height: 48px;
-            color: #0284c7;
-          }
-          .hosp-titles {
-            display: flex;
-            flex-direction: column;
-          }
-          .hosp-name {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            font-size: 24px;
-            font-weight: 800;
-            margin: 0;
-            letter-spacing: 0.8px;
-            text-transform: uppercase;
-            color: #0f172a;
-            line-height: 1.1;
-          }
-          .hosp-tagline {
-            font-size: 9px;
-            font-weight: 700;
-            color: #64748b;
-            margin: 4px 0 0 0;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-          }
-          .hosp-contact {
-            text-align: right;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-          }
-          .contact-item {
-            font-size: 11.5px;
-            font-weight: 600;
-            color: #475569;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 6px;
-          }
-          .contact-svg {
-            width: 13px;
-            height: 13px;
-            color: #0284c7;
-          }
-          .divider {
-            display: ${isValidTemplateImage ? 'none' : 'block'};
-            height: 3px;
-            background: linear-gradient(90deg, #0284c7 0%, #0369a1 40%, #0f172a 100%);
-            border-radius: 2px;
-            margin-top: 15px;
-            margin-bottom: 12px;
-          }
-          
-          /* Patient Box Grid */
-          .patient-box {
-            display: grid;
-            grid-template-cols: 1.1fr 1fr 0.95fr 0.95fr;
-            border: 1.5px solid #e2e8f0;
-            border-left: 4px solid #0284c7;
-            border-radius: 12px;
-            padding: 13px 18px;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            margin-bottom: 25px;
-            box-sizing: border-box;
-            gap: 15px;
-          }
-          .patient-field {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-          }
-          .patient-field.text-right {
-            align-items: flex-end;
-            text-align: right;
-          }
-          .info-label {
-            font-weight: 800;
-            color: #64748b;
-            text-transform: uppercase;
-            font-size: 9px;
-            letter-spacing: 0.08em;
-          }
-          .info-value {
-            font-size: 13px;
-            font-weight: 700;
-            color: #0f172a;
           }
           
           /* Rx Symbol & Watermark */
@@ -256,7 +154,7 @@ export function getPrescriptionPrintHtml(
             font-weight: 700;
             font-family: 'Playfair Display', Georgia, serif;
             margin: 0 0 12px 0;
-            color: #0284c7;
+            color: #1d4ed8;
             display: inline-block;
           }
           .watermark {
@@ -264,9 +162,9 @@ export function getPrescriptionPrintHtml(
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 300px;
-            height: 300px;
-            opacity: 0.02;
+            width: 320px;
+            height: 320px;
+            opacity: 0.03;
             z-index: -2;
             pointer-events: none;
           }
@@ -279,7 +177,7 @@ export function getPrescriptionPrintHtml(
             z-index: 10;
           }
           .meds-table th {
-            background-color: #0f172a;
+            background-color: #1e3a8a;
             color: #ffffff;
             font-size: 10.5px;
             font-weight: 800;
@@ -299,17 +197,16 @@ export function getPrescriptionPrintHtml(
           
           /* Footer & Authorizations */
           .footer-section {
-            margin-top: auto;
-            padding-top: 35px;
+            margin-top: 20px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
             page-break-inside: avoid;
-            margin-bottom: 2mm;
+            margin-bottom: 15px;
           }
           .footer-left {
             max-width: 360px;
-            border-left: 3px solid #0284c7;
+            border-left: 3px solid #1d4ed8;
             padding-left: 12px;
           }
           .footer-right {
@@ -348,61 +245,81 @@ export function getPrescriptionPrintHtml(
       </head>
       <body>
         <!-- Background Premium Watermark -->
-        <svg class="watermark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
-          <path d="M19 10.5H13.5V5C13.5 4.17157 12.8284 3.5 12 3.5C11.1716 3.5 10.5 4.17157 10.5 5V10.5H5C4.17157 10.5 3.5 11.1716 3.5 12C3.5 12.8284 4.17157 13.5 5 13.5H10.5V19C10.5 19.8284 11.1716 20.5 12 20.5C12.8284 20.5 13.5 19.8284 13.5 19V13.5H19C19.8284 13.5 20.5 12.8284 20.5 12C20.5 11.1716 19.8284 10.5 19 10.5Z" fill="#0284c7"/>
-        </svg>
+        <div class="watermark">
+          <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+            <circle cx="50" cy="50" r="46" fill="none" stroke="#1d4ed8" stroke-width="3" />
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#ef4444" stroke-width="1.5" />
+            <!-- Letters GH in bold blue -->
+            <text x="50" y="55" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="24" fill="#1d4ed8" text-anchor="middle" style="letter-spacing: -0.5px;">GH</text>
+          </svg>
+        </div>
 
         <div class="container">
           ${isValidTemplateImage ? `<div class="template-bg"><img src="${actualTemplateImage}" style="width: 100%;" /></div>` : ''}
           
+          <!-- Custom Bilingual Premium Letterhead from Image 2 -->
           <div class="header">
-            <div class="header-grid">
-              <div class="logo-area">
-                <!-- Premium hospital vector emblem -->
-                <svg class="hosp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M19 10.5H13.5V5C13.5 4.17157 12.8284 3.5 12 3.5C11.1716 3.5 10.5 4.17157 10.5 5V10.5H5C4.17157 10.5 3.5 11.1716 3.5 12C3.5 12.8284 4.17157 13.5 5 13.5H10.5V19C10.5 19.8284 11.1716 20.5 12 20.5C12.8284 20.5 13.5 19.8284 13.5 19V13.5H19C19.8284 13.5 20.5 12.8284 20.5 12C20.5 11.1716 19.8284 10.5 19 10.5Z" fill="#e0f2fe"/>
-                  <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM4 12C4 7.58172 7.58172 4 12 4C16.4183 4 20 7.58172 20 12C20 16.4183 16.4183 20 12 20C7.58172 20 4 16.4183 4 12Z" fill="#0f172a" />
-                </svg>
-                <div class="hosp-titles">
-                  <h1 class="hosp-name">${hospName}</h1>
-                  <p class="hosp-tagline">Multispeciality Clinical Care & Quality Diagnostics</p>
+            <div style="position: relative; padding: 15px 20px; display: flex; align-items: center; background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 60%, #e0f2fe 100%); border-bottom: 3.5px solid #b91c1c; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03); overflow: hidden;">
+              <!-- Top blue gradient accent bar -->
+              <div style="position: absolute; top: 0; left: 0; right: 0; height: 8px; background: linear-gradient(90deg, #1d4ed8 0%, #3b82f6 50%, #1d4ed8 100%);"></div>
+              
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 5px;">
+                <!-- Left: Circular Logo -->
+                <div style="flex-shrink: 0; margin-right: 15px;">
+                  <svg viewBox="0 0 100 100" style="width: 80px; height: 80px;">
+                    <!-- Outer Blue Ring with double lines -->
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#1d4ed8" stroke-width="3.5" />
+                    <circle cx="50" cy="50" r="41" fill="none" stroke="#ef4444" stroke-width="1.5" />
+                    <circle cx="50" cy="50" r="40" fill="#ffffff" />
+                    <!-- Medical Cross symbol faint in center -->
+                    <path d="M44 28 H56 V72 H44 Z" fill="#ef4444" opacity="0.1" />
+                    <path d="M28 44 H72 V56 H28 Z" fill="#ef4444" opacity="0.1" />
+                    <!-- Inner red dotted/dashed circle -->
+                    <circle cx="50" cy="50" r="34" fill="none" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2" />
+                    <!-- Letters GH in bold blue -->
+                    <text x="50" y="53" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="22" fill="#1d4ed8" text-anchor="middle" dominant-baseline="middle" style="letter-spacing: -0.5px;">GH</text>
+                    <!-- Hindi curved text at top -->
+                    <text x="50" y="24" font-family="'Noto Sans Devanagari', sans-serif" font-weight="700" font-size="5.5" fill="#ef4444" text-anchor="middle">ग्लोबल हॉस्पिटल</text>
+                    <!-- English curved text at bottom -->
+                    <text x="50" y="80" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="5.5" fill="#1d4ed8" text-anchor="middle">MATERNITY CENTRE</text>
+                  </svg>
+                </div>
+                
+                <!-- Middle: Center Title with Red & White Styling from Image 2 -->
+                <div style="flex-grow: 1; text-align: center;">
+                  <div style="font-family: 'Noto Sans Devanagari', sans-serif; font-weight: 900; font-size: 38px; color: #ef4444; text-shadow: 2px 2px 0px #fff, -2px -2px 0px #fff, 2px -2px 0px #fff, -2px 2px 0px #fff, 3px 3px 5px rgba(0,0,0,0.2); text-transform: uppercase; margin: 0; line-height: 1; letter-spacing: 0.5px;">ग्लोबल हॉस्पिटल</div>
+                  <div style="font-family: 'Noto Sans Devanagari', sans-serif; font-weight: 800; font-size: 21px; color: #ef4444; margin-top: 5px; text-shadow: 1px 1px 0px #fff; letter-spacing: 0.5px; line-height: 1;">एण्ड मैटरनिटी सेंटर</div>
+                  <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 10px; color: #1d4ed8; letter-spacing: 2px; text-transform: uppercase; margin-top: 6px; opacity: 0.9;">Global Hospital & Maternity Centre</div>
+                </div>
+
+                <!-- Right: Extra spacing for visual symmetry, or we can put a beautiful caduceus/hospital icon -->
+                <div style="flex-shrink: 0; width: 80px; text-align: right; opacity: 0.15;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="1.5" style="width: 55px; height: 55px; margin-left: auto;">
+                    <path d="M19 10.5H13.5V5C13.5 4.17157 12.8284 3.5 12 3.5C11.1716 3.5 10.5 4.17157 10.5 5V10.5H5C4.17157 10.5 3.5 11.1716 3.5 12C3.5 12.8284 4.17157 13.5 5 13.5H10.5V19C10.5 19.8284 11.1716 20.5 12 20.5C12.8284 20.5 13.5 19.8284 13.5 19V13.5H19C19.8284 13.5 20.5 12.8284 20.5 12C20.5 11.1716 19.8284 10.5 19 10.5Z" fill="#e0f2fe"/>
+                    <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" />
+                  </svg>
                 </div>
               </div>
-              <div class="hosp-contact">
-                <p class="contact-item">
-                  <svg class="contact-svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  ${hospAddress}
-                </p>
-                <p class="contact-item">
-                  <svg class="contact-svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                  ${hospPhone}
-                </p>
-                <p class="contact-item">
-                  <svg class="contact-svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                  ${hospEmail}
-                </p>
-              </div>
             </div>
-            
-            <div class="divider"></div>
           </div>
           
-          <div class="patient-box">
-            <div class="patient-field">
-              <span class="info-label">Patient Name</span>
-              <span class="info-value">${patName}</span>
+          <!-- Dotted Line Patient Information Grid from Image 2 -->
+          <div style="display: flex; gap: 20px; flex-wrap: wrap; border-top: 1.5px solid #e2e8f0; border-bottom: 1.5px solid #e2e8f0; padding: 12px 10px; margin-bottom: 25px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 700; color: #1e293b;">
+            <div style="flex: 1.8; min-width: 260px; display: flex; align-items: flex-end;">
+              <span>Patient Name:</span>
+              <span style="flex-grow: 1; border-bottom: 1.5px dotted #94a3b8; margin-left: 8px; padding-bottom: 2px; font-weight: 800; color: #1d4ed8; padding-left: 5px;">${patName}</span>
             </div>
-            <div class="patient-field">
-              <span class="info-label">Age / Gender</span>
-              <span class="info-value">${patAgeGender}</span>
+            <div style="flex: 1; min-width: 140px; display: flex; align-items: flex-end;">
+              <span>Age / Sex:</span>
+              <span style="flex-grow: 1; border-bottom: 1.5px dotted #94a3b8; margin-left: 8px; padding-bottom: 2px; font-weight: 800; color: #1d4ed8; padding-left: 5px;">${patAgeGender}</span>
             </div>
-            <div class="patient-field text-right">
-              <span class="info-label">Date of Issue</span>
-              <span class="info-value">${presDate}</span>
+            <div style="flex: 1; min-width: 130px; display: flex; align-items: flex-end;">
+              <span>Date:</span>
+              <span style="flex-grow: 1; border-bottom: 1.5px dotted #94a3b8; margin-left: 8px; padding-bottom: 2px; font-weight: 800; color: #1d4ed8; padding-left: 5px;">${presDate}</span>
             </div>
-            <div class="patient-field text-right">
-              <span class="info-label">Patient MRN</span>
-              <span class="info-value">${patMRN}</span>
+            <div style="flex: 1; min-width: 130px; display: flex; align-items: flex-end;">
+              <span>MRN:</span>
+              <span style="flex-grow: 1; border-bottom: 1.5px dotted #94a3b8; margin-left: 8px; padding-bottom: 2px; font-weight: 800; color: #1d4ed8; padding-left: 5px;">${patMRN}</span>
             </div>
           </div>
           
@@ -428,9 +345,9 @@ export function getPrescriptionPrintHtml(
           
           <div class="footer-section">
             <div class="footer-left">
-              <h3 style="font-size: 11px; font-weight: 800; color: #015f91; margin: 0 0 3px 0; text-transform: uppercase; letter-spacing: 0.05em; font-family: 'Plus Jakarta Sans', sans-serif;">Digital Health Record</h3>
+              <h3 style="font-size: 11px; font-weight: 800; color: #1d4ed8; margin: 0 0 3px 0; text-transform: uppercase; letter-spacing: 0.05em; font-family: 'Plus Jakarta Sans', sans-serif;">Digital Health Record</h3>
               <p style="font-size: 10px; color: #64748b; margin: 0; line-height: 1.5; font-weight: 500;">
-                This document is a authorized clinical prescription registered under hospital safety guidelines. Valid for 7 days.
+                This document is an authorized clinical prescription registered under hospital safety guidelines. Valid for 7 days.
               </p>
             </div>
             <div class="footer-right">
@@ -439,6 +356,44 @@ export function getPrescriptionPrintHtml(
               <p class="doc-reg">${docReg}</p>
               <p class="doc-spec">${docSpecialty}</p>
             </div>
+          </div>
+
+          <!-- Bottom Custom Footer from Image 2 -->
+          <div style="margin-top: auto; page-break-inside: avoid;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 10px 5px 10px; border-top: 1.5px solid #e2e8f0;">
+              <!-- Left: 24/7 Services Badge -->
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="position: relative; width: 44px; height: 44px; background-color: #1d4ed8; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #ef4444; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                  <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 900; font-size: 13px; color: #ffffff; position: absolute; top: 6px; left: 6px;">24</span>
+                  <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 900; font-size: 13px; color: #ef4444; position: absolute; bottom: 6px; right: 6px;">7</span>
+                  <div style="position: absolute; width: 28px; height: 1.5px; background-color: #ffffff; transform: rotate(-45deg);"></div>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                  <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 10px; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1;">Emergency</span>
+                  <span style="font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 900; font-size: 12px; color: #ef4444; text-transform: uppercase; line-height: 1.1;">Services</span>
+                </div>
+              </div>
+
+              <!-- Middle/Left: Location Address (Reddish brown/crimson) -->
+              <div style="display: flex; align-items: center; gap: 6px; color: #b91c1c; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; font-weight: 700; max-width: 320px; line-height: 1.4;">
+                <span style="font-size: 14px; color: #ef4444;">📍</span>
+                <span>Near-Aura Inn Hotel, Bargadwa Badeban, Bansi & Dumariyaganj Road-Basti 272001</span>
+              </div>
+
+              <!-- Right: Telephone Numbers with red circular icon -->
+              <div style="display: flex; align-items: center; gap: 10px; border-left: 1.5px solid #e2e8f0; padding-left: 15px;">
+                <div style="display: flex; flex-direction: column; text-align: left; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 800; color: #1d4ed8; line-height: 1.3;">
+                  <span style="display: flex; align-items: center; gap: 4px;">+91-8299713820</span>
+                  <span style="display: flex; align-items: center; gap: 4px;">+91-7007128144</span>
+                </div>
+                <div style="width: 28px; height: 28px; background-color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  📞
+                </div>
+              </div>
+            </div>
+            
+            <!-- Dark blue solid strip at the very bottom -->
+            <div style="height: 12px; background-color: #1e3a8a; margin-top: 10px; border-radius: 2px; width: 100%;"></div>
           </div>
         </div>
         
