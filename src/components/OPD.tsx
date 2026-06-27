@@ -116,6 +116,8 @@ export default function OPD() {
   const [loading, setLoading] = useState(true);
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>('all');
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>('');
+  const [fromDateFilter, setFromDateFilter] = useState<string>('');
+  const [toDateFilter, setToDateFilter] = useState<string>('');
   const [appointmentFee, setAppointmentFee] = useState<number>(() => {
     const charges = storage.get(STORAGE_KEYS.OPD_CHARGES, { reg: 200, appt: 300, consult: 500 });
     return charges.consult || 500;
@@ -1940,6 +1942,37 @@ export default function OPD() {
                     </Button>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs shrink-0">From:</Label>
+                  <Input 
+                    type="date" 
+                    className="w-[140px] h-9 bg-slate-50 border-none text-xs" 
+                    value={fromDateFilter}
+                    onChange={(e) => setFromDateFilter(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs shrink-0">To:</Label>
+                  <Input 
+                    type="date" 
+                    className="w-[140px] h-9 bg-slate-50 border-none text-xs" 
+                    value={toDateFilter}
+                    onChange={(e) => setToDateFilter(e.target.value)}
+                  />
+                  {(fromDateFilter || toDateFilter) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 px-1.5 text-rose-500 hover:text-rose-600 hover:bg-rose-50 text-xs"
+                      onClick={() => {
+                        setFromDateFilter('');
+                        setToDateFilter('');
+                      }}
+                    >
+                      Clear Range
+                    </Button>
+                  )}
+                </div>
               </>
             )}
             <Button variant="outline" size="icon">
@@ -2090,6 +2123,18 @@ export default function OPD() {
                   {appointments
                     .filter(apt => {
                       const aptDate = typeof apt.appointment_date === 'string' ? apt.appointment_date : new Date(apt.appointment_date).toISOString().split('T')[0];
+                      
+                      // Filter by Date Range if specified
+                      if (fromDateFilter || toDateFilter) {
+                        if (fromDateFilter && aptDate < fromDateFilter) {
+                          return false;
+                        }
+                        if (toDateFilter && aptDate > toDateFilter) {
+                          return false;
+                        }
+                        return true;
+                      }
+
                       if (activeTab === 'queue') {
                         const targetDate = selectedDateFilter || new Date().toISOString().split('T')[0];
                         return aptDate === targetDate;
