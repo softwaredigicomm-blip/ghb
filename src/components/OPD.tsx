@@ -127,7 +127,7 @@ export default function OPD() {
   const [selectedRegFees, setSelectedRegFees] = useState(() => {
     const charges = storage.get(STORAGE_KEYS.OPD_CHARGES, { reg: 200, appt: 300, consult: 500 });
     return {
-      reg: { name: 'OPD Registration Fee', checked: true, amount: charges.reg },
+      reg: { name: 'OPD Registration Fee', checked: false, amount: 0 },
       appt: { name: 'Appointment Fee', checked: false, amount: charges.appt },
       consult: { name: 'Consultation Fee', checked: false, amount: charges.consult }
     };
@@ -136,7 +136,7 @@ export default function OPD() {
   const [selectedApptFees, setSelectedApptFees] = useState(() => {
     const charges = storage.get(STORAGE_KEYS.OPD_CHARGES, { reg: 200, appt: 300, consult: 500 });
     return {
-      reg: { name: 'OPD Registration Fee', checked: true, amount: 0 },
+      reg: { name: 'OPD Registration Fee', checked: false, amount: 0 },
       appt: { name: 'Appointment Fee', checked: true, amount: 0 },
       consult: { name: 'Consultation Fee', checked: true, amount: charges.consult }
     };
@@ -299,12 +299,12 @@ export default function OPD() {
       const charges = storage.get(STORAGE_KEYS.OPD_CHARGES, { reg: 200, appt: 300, consult: 500 });
       setAppointmentFee(charges.consult || 500);
       setSelectedRegFees({
-        reg: { name: 'OPD Registration Fee', checked: true, amount: charges.reg },
+        reg: { name: 'OPD Registration Fee', checked: false, amount: 0 },
         appt: { name: 'Appointment Fee', checked: false, amount: charges.appt },
         consult: { name: 'Consultation Fee', checked: false, amount: charges.consult }
       });
       setSelectedApptFees({
-        reg: { name: 'OPD Registration Fee', checked: true, amount: 0 },
+        reg: { name: 'OPD Registration Fee', checked: false, amount: 0 },
         appt: { name: 'Appointment Fee', checked: true, amount: 0 },
         consult: { name: 'Consultation Fee', checked: true, amount: charges.consult }
       });
@@ -711,37 +711,11 @@ export default function OPD() {
       setPatients(updatedList);
       storage.set(STORAGE_KEYS.PATIENTS, updatedList);
 
-      // Automatically charge standard OPD Registration Fee if greater than 0
+      // No standard OPD Registration Fee collected per user instructions
       const selectedInvoiceItems: any[] = [];
       let calculatedTotal = 0;
 
-      const regFeeAmount = selectedRegFees?.reg?.amount || 0;
-      if (regFeeAmount > 0) {
-        selectedInvoiceItems.push({
-          item_name: 'OPD Registration Fee',
-          item_type: 'Consultation',
-          quantity: 1,
-          unit_price: regFeeAmount,
-          total_price: regFeeAmount
-        });
-        calculatedTotal += regFeeAmount;
-      }
-
-      if (selectedInvoiceItems.length > 0) {
-        // Create Invoice for standard OPD registration fee
-        const invoiceData = {
-          patient_id: synced.id,
-          invoice_number: `INV-REG-${Date.now()}`,
-          status: 'Unpaid',
-          total_amount: calculatedTotal,
-          paid_amount: 0,
-          payment_method: 'Cash',
-          type: 'OPD',
-          created_by: currentUser?.id
-        };
-
-        await supabaseService.createInvoice(invoiceData, selectedInvoiceItems);
-      }
+      const regFeeAmount = 0;
 
       setLastToken({
         tokenNumber,
@@ -755,6 +729,8 @@ export default function OPD() {
       setIsRegisterOpen(false);
       if (!shouldRedirect) {
         setIsTokenSuccessOpen(true);
+        setActiveTab('patients');
+        setPatientRecordsSearchQuery(synced.name);
       }
       playNotificationSound();
 
@@ -1494,35 +1470,6 @@ export default function OPD() {
                     <Label className="text-xs font-black uppercase text-slate-500 tracking-wider">Applicable Fees / Charges Config</Label>
                     <p className="text-[10px] text-muted-foreground mb-2">Check to enable one or more than one applicable fees for this appointment, and edit amounts if needed.</p>
                     
-                    {/* Row 1: Reg Fee */}
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-2">
-                        <input 
-                          id="appt-reg-fee-chk"
-                          type="checkbox" 
-                          checked={selectedApptFees.reg.checked}
-                          onChange={(e) => setSelectedApptFees({
-                            ...selectedApptFees, 
-                            reg: { ...selectedApptFees.reg, checked: e.target.checked }
-                          })}
-                          className="h-4 w-4 rounded border-slate-300 text-medical-blue focus:ring-medical-blue cursor-pointer"
-                        />
-                        <Label htmlFor="appt-reg-fee-chk" className="text-xs font-black text-slate-700 cursor-pointer">OPD Registration Fee</Label>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-slate-400">₹</span>
-                        <Input 
-                          type="number"
-                          value={selectedApptFees.reg.amount}
-                          onChange={(e) => setSelectedApptFees({
-                            ...selectedApptFees, 
-                            reg: { ...selectedApptFees.reg, amount: Number(e.target.value) }
-                          })}
-                          className="w-24 h-8 text-xs text-right font-bold bg-white"
-                        />
-                      </div>
-                    </div>
-
                     {/* Row 2: Appt Fee */}
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-2">
