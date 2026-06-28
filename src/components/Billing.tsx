@@ -41,7 +41,7 @@ import { Separator } from '@/components/ui/separator';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { MOCK_USERS, MOCK_BILLING, MOCK_BED_RATES, MOCK_OT_RATES, MOCK_LAB_TESTS, MOCK_MATERIAL_RATES } from '@/mockData';
-import { supabaseService } from '@/services/supabaseService';
+import { supabaseService, isDummyPatient } from '@/services/supabaseService';
 import { useDataSync } from '@/hooks/useDataSync';
 import { 
   ResponsiveContainer, 
@@ -107,19 +107,33 @@ export default function Billing() {
         return {
           ...inv,
           patients: inv.patients || (matchedPatient ? {
+            id: matchedPatient.id,
             name: matchedPatient.name,
             mrn: matchedPatient.mrn,
             phone: matchedPatient.phone,
             email: matchedPatient.email
           } : null)
         };
+      }).filter((inv: any) => {
+        const pId = inv.patient_id || inv.patientId;
+        const matchedPatient = patientsData ? patientsData.find((p: any) => p.id === pId) : null;
+        const patObj = inv.patients || matchedPatient || { id: pId };
+        return !isDummyPatient(patObj);
       });
       setBills(enrichedInvoices);
     }
     if (patientsData) setPatients(patientsData);
     if (staffData && staffData.length > 0) setUsers(staffData);
     if (expensesData) setExpenses(expensesData);
-    if (appointmentsData) setAppointments(appointmentsData);
+    if (appointmentsData) {
+      const filteredApts = appointmentsData.filter((apt: any) => {
+        const pId = apt.patient_id || apt.patientId;
+        const matchedPatient = patientsData ? patientsData.find((p: any) => p.id === pId) : null;
+        const patObj = matchedPatient || { id: pId, name: apt.patientName || apt.patient_name, phone: apt.patientPhone || apt.patient_phone };
+        return !isDummyPatient(patObj);
+      });
+      setAppointments(filteredApts);
+    }
     setLoading(false);
   };
 

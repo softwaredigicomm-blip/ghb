@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { isDummyPatient } from '@/services/supabaseService';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -70,6 +71,15 @@ export function OPDCollectionTab({
         refundGivenBy: apt.refund_given_by || apt.refundGivenBy || null,
         paymentStatus: apt.payment_status || 'Pending'
       };
+    }).filter((apt: any) => {
+      const pId = apt.patient_id || apt.patientId;
+      const matchedPatient = patients.find((p: any) => 
+        p.id === pId || 
+        p.mrn === pId || 
+        (p.id && pId && String(p.id).replace(/[^0-9a-zA-Z]/g, '') === String(pId).replace(/[^0-9a-zA-Z]/g, ''))
+      );
+      const patObj = matchedPatient || { id: pId, name: apt.patientName, phone: apt.patientPhone };
+      return !isDummyPatient(patObj);
     });
   }, [appointments, patients, users]);
 

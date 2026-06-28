@@ -1098,6 +1098,7 @@ const rawSupabaseService = {
         status: patient.status || 'Active',
         created_at: patient.created_at || new Date().toISOString()
       });
+      newPatient.isOffline = true;
       list.unshift(newPatient);
       storage.set(STORAGE_KEYS.PATIENTS, list);
       broadcastDataMutation('patients', 'insert');
@@ -3669,6 +3670,7 @@ function executeOfflineMutation(key: string, args: any[]): any {
       if (!item.id) {
         item.id = 'off-' + Math.random().toString(36).substring(2, 9);
       }
+      item.isOffline = true;
       if (!item.created_at) {
         item.created_at = new Date().toISOString();
       }
@@ -4424,7 +4426,8 @@ for (const [key, value] of Object.entries(rawSupabaseService)) {
                   const idStr = String(item.id);
                   // Any non-UUID is generated locally (temporary, mock, or offline fallback) and must be preserved
                   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idStr);
-                  return !isUuid;
+                  const isOfflineItem = !isUuid || idStr.includes('off-') || item.isOffline === true || item.is_offline === true;
+                  return isOfflineItem;
                 });
                 if (offlineItems.length > 0) {
                   const existingIds = new Set(finalResult.map((item: any) => item && item.id));
