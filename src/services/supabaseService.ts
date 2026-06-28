@@ -992,20 +992,16 @@ export function normalizePatient(p: any) {
 
 export function isDummyPatient(p: any): boolean {
   if (!p) return false;
-  const name = (p.name || '').trim();
-  const phone = (p.phone || '').trim();
-  const id = String(p.id || '');
-  
+  const name = (p.name || '').toLowerCase();
+  const id = String(p.id || '').toLowerCase();
   return (
-    id === 'p1' || 
-    id === 'p2' || 
-    id === 'pat1' || 
-    id === 'pat2' || 
-    id === 'pat3' || 
-    id.startsWith('seed-') ||
-    (name === 'Amit Patel' && phone === '9876543210') ||
-    (name === 'Priya Singh' && phone === '9123456789') ||
-    (name === 'Rahul Sharma' && phone === '9543210987')
+    name.includes('dummy') ||
+    name.includes('test') ||
+    name.includes('mock') ||
+    name.includes('trial') ||
+    name.includes('temp') ||
+    id.includes('dummy') ||
+    id.includes('test')
   );
 }
 
