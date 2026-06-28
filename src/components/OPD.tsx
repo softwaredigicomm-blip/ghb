@@ -599,6 +599,23 @@ export default function OPD() {
     setIsAppointmentOpen(true);
   };
 
+  const startBookAppointmentForPatient = (patient: any) => {
+    setEditingAppointment(null);
+    setNewAppointment({
+      patientId: patient.id,
+      doctor: '',
+      date: new Date().toISOString().split('T')[0],
+      time: '',
+      urgency: 'Routine',
+      discountAmount: '0',
+      discountGivenBy: ''
+    });
+    setPatientSearchTerm(patient.name);
+    setShowPatientResults(false);
+    setIsAppointmentOpen(true);
+    setActiveTab('appointments');
+  };
+
   const handleRegistration = async (shouldRedirect: boolean = false) => {
     if (!newPatient.name) {
       toast.error('Please enter the patient\'s Full Name');
@@ -736,6 +753,9 @@ export default function OPD() {
       });
 
       setIsRegisterOpen(false);
+      if (!shouldRedirect) {
+        setIsTokenSuccessOpen(true);
+      }
       playNotificationSound();
 
       // Reset form
@@ -2054,6 +2074,17 @@ export default function OPD() {
                           <Button 
                             variant="ghost" 
                             size="sm" 
+                            className="text-medical-blue h-8 gap-1.5 whitespace-nowrap font-medium hover:bg-blue-50/50" 
+                            onClick={() => {
+                              startBookAppointmentForPatient(patient);
+                            }}
+                          >
+                            <CalendarIcon className="w-4 h-4 text-medical-blue" />
+                            Book Appointment
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
                             className="text-emerald-600 h-8 gap-1.5 whitespace-nowrap" 
                             onClick={() => {
                               openPrescriptionModal(patient);
@@ -2326,17 +2357,37 @@ export default function OPD() {
       {/* Token Success Dialog */}
       <Dialog open={isTokenSuccessOpen} onOpenChange={setIsTokenSuccessOpen}>
         <DialogContent className="sm:max-w-[400px]">
-          <div className="flex flex-col items-center justify-center py-8 space-y-4">
+          <div className="flex flex-col items-center justify-center py-6 space-y-4">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <div className="text-center">
-              <h3 className="text-xl font-bold">Success!</h3>
-              <p className="text-sm text-muted-foreground">Token {lastToken?.tokenNumber} has been generated.</p>
-              {lastToken?.fee && <p className="text-sm font-bold text-medical-blue mt-1">Fee: ₹{lastToken.fee}</p>}
+            <div className="text-center w-full px-2">
+              <h3 className="text-xl font-bold text-slate-900 mb-1">Registration Success!</h3>
+              <p className="text-sm text-emerald-600 font-semibold mb-3">Patient Registered Successfully</p>
+              
+              <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-left space-y-2 text-xs text-slate-600">
+                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
+                  <span className="font-semibold text-slate-700">Patient Name:</span> 
+                  <span className="font-bold text-slate-900">{lastToken?.patientName}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
+                  <span className="font-semibold text-slate-700">MRN:</span> 
+                  <span className="font-mono text-medical-blue font-bold">{lastToken?.mrn}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
+                  <span className="font-semibold text-slate-700">Token Number:</span> 
+                  <span className="font-mono font-bold text-emerald-600">{lastToken?.tokenNumber}</span>
+                </div>
+                {lastToken?.fee ? (
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-700">Registration Fee:</span> 
+                    <span className="font-bold text-slate-900">₹{lastToken.fee}</span>
+                  </div>
+                ) : null}
+              </div>
             </div>
-            <div className="w-full flex gap-2 pt-4">
-              <Button variant="outline" className="flex-1 gap-2" onClick={printToken}>
+            <div className="w-full flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1 gap-2 border-slate-200" onClick={printToken}>
                 <Printer className="w-4 h-4" />
                 Print Token
               </Button>
