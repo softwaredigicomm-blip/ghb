@@ -1216,7 +1216,8 @@ const rawSupabaseService = {
         .select('*, patients(name, mrn)');
       
       if (patientId) {
-        query = query.eq('patient_id', patientId);
+        const cleanId = isUuid(patientId) ? patientId : toDeterministicUuid(patientId);
+        query = query.eq('patient_id', cleanId);
       }
       
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -3045,7 +3046,8 @@ const rawSupabaseService = {
         .select('*');
       
       if (patientId) {
-        query = query.eq('patient_id', patientId);
+        const cleanId = isUuid(patientId) ? patientId : toDeterministicUuid(patientId);
+        query = query.eq('patient_id', cleanId);
       }
 
       const { data, error } = await query.order('recorded_at', { ascending: false });
@@ -3072,10 +3074,11 @@ const rawSupabaseService = {
   // Clinical Notes
   getClinicalNotes: async (patientId: string) => {
     try {
+      const cleanId = isUuid(patientId) ? patientId : toDeterministicUuid(patientId);
       const { data, error } = await supabase
         .from('clinical_notes')
         .select('*, profiles(name)')
-        .eq('patient_id', patientId)
+        .eq('patient_id', cleanId)
         .order('created_at', { ascending: false });
       
       if (error) throw error;

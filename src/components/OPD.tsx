@@ -599,7 +599,7 @@ export default function OPD() {
     setIsAppointmentOpen(true);
   };
 
-  const handleRegistration = async () => {
+  const handleRegistration = async (shouldRedirect: boolean = false) => {
     if (!newPatient.name) {
       toast.error('Please enter the patient\'s Full Name');
       return;
@@ -690,7 +690,9 @@ export default function OPD() {
     });
 
     if (synced) {
-      setPatients([synced, ...patients]);
+      const updatedList = [synced, ...patients];
+      setPatients(updatedList);
+      storage.set(STORAGE_KEYS.PATIENTS, updatedList);
 
       // Automatically charge standard OPD Registration Fee if greater than 0
       const selectedInvoiceItems: any[] = [];
@@ -734,28 +736,8 @@ export default function OPD() {
       });
 
       setIsRegisterOpen(false);
-      
-      // Redirect to Appointment immediately after registration
-      setNewAppointment({
-        patientId: synced.id,
-        doctor: '',
-        date: new Date().toISOString().split('T')[0],
-        time: '',
-        urgency: 'Routine',
-        discountAmount: '0',
-        discountGivenBy: ''
-      });
-      setPatientSearchTerm(synced.name);
-      setShowPatientResults(false);
-      
-      // Wrap in setTimeout to ensure the first dialog fully finishes its close animation and focus release 
-      // before opening the Book New Appointment dialog
-      setTimeout(() => {
-        setIsAppointmentOpen(true);
-        setActiveTab('appointments');
-      }, 150);
-
       playNotificationSound();
+
       // Reset form
       setNewPatient({ 
         name: '', 
@@ -777,7 +759,34 @@ export default function OPD() {
         guardianName: '',
         urgency: 'Routine'
       });
-      toast.success('Patient registered and redirected to Appointment Booking');
+
+      if (shouldRedirect) {
+        // Redirect to Appointment Booking
+        setNewAppointment({
+          patientId: synced.id,
+          doctor: '',
+          date: new Date().toISOString().split('T')[0],
+          time: '',
+          urgency: 'Routine',
+          discountAmount: '0',
+          discountGivenBy: ''
+        });
+        setPatientSearchTerm(synced.name);
+        setShowPatientResults(false);
+        
+        // Wrap in setTimeout to ensure the first dialog fully finishes its close animation and focus release 
+        // before opening the Book New Appointment dialog
+        setTimeout(() => {
+          setIsAppointmentOpen(true);
+          setActiveTab('appointments');
+        }, 150);
+
+        toast.success('Patient registered and redirected to Appointment Booking');
+      } else {
+        toast.success('Patient registered successfully');
+      }
+
+      window.dispatchEvent(new Event('storage'));
     } else {
       toast.error('Failed to register patient');
     }
@@ -1849,9 +1858,20 @@ export default function OPD() {
 
                   </div>
                 </div>
-                <DialogFooter className="shrink-0 mt-auto pt-2 border-t">
+                <DialogFooter className="shrink-0 mt-auto pt-2 border-t gap-2 flex-wrap sm:justify-end">
                   <Button variant="outline" onClick={() => setIsRegisterOpen(false)}>Cancel</Button>
-                  <Button className="bg-medical-blue" onClick={handleRegistration}>{editingPatient ? 'Save Changes' : 'Register & Generate Token'}</Button>
+                  {editingPatient ? (
+                    <Button className="bg-medical-blue font-semibold" onClick={() => handleRegistration(false)}>Save Changes</Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" className="border-medical-blue text-medical-blue hover:bg-medical-blue/10 font-semibold" onClick={() => handleRegistration(false)}>
+                        Register Patient
+                      </Button>
+                      <Button className="bg-medical-blue font-semibold" onClick={() => handleRegistration(true)}>
+                        Book Appointment
+                      </Button>
+                    </>
+                  )}
                 </DialogFooter>
               </DialogContent>
             </Dialog>
