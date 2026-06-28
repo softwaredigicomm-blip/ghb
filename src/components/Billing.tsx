@@ -504,6 +504,33 @@ export default function Billing() {
 
   const [conPatientId, setConPatientId] = useState<string>('');
   const [conPatientSearch, setConPatientSearch] = useState<string>('');
+  const [outstandingSearchQuery, setOutstandingSearchQuery] = useState<string>('');
+
+  const activePatientsWithOutstanding = useMemo(() => {
+    return patients.map(p => {
+      const patientBills = bills.filter(b => b.patient_id === p.id || b.patientId === p.id);
+      const grossTotal = patientBills.reduce((sum, b) => sum + Number(b.total_amount || b.totalAmount || 0), 0);
+      const discTotal = patientBills.reduce((sum, b) => sum + Number(b.discount_amount || b.discount || 0), 0);
+      const paidTotal = patientBills.reduce((sum, b) => sum + Number(b.paid_amount || b.paidAmount || 0), 0);
+      const outstandingDues = Math.max(0, grossTotal - discTotal - paidTotal);
+      return {
+        ...p,
+        grossTotal,
+        discTotal,
+        paidTotal,
+        outstandingDues
+      };
+    })
+    .filter(p => p.outstandingDues > 0 && !isDummyPatient(p))
+    .filter(p => {
+      if (!outstandingSearchQuery.trim()) return true;
+      const q = outstandingSearchQuery.toLowerCase();
+      return (p.name || '').toLowerCase().includes(q) ||
+             (p.mrn || '').toLowerCase().includes(q) ||
+             (p.phone || '').includes(q);
+    });
+  }, [patients, bills, outstandingSearchQuery]);
+
   const [showConPatientResults, setShowConPatientResults] = useState<boolean>(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -3101,8 +3128,92 @@ export default function Billing() {
             )}
 
             {!conPatientId && (
-              <div className="p-12 text-center text-xs text-slate-400 border border-dashed rounded-xl">
-                Please search and select a patient to fetch their consolidated, date-wise itemized medical bills.
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                      Active Patients Outstanding Balances Ledger
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      All active real patients with unpaid/unsettled billing records across OPD, IPD, Diagnostics, and Pharmacy.
+                    </p>
+                  </div>
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <Input
+                      placeholder="Filter ledger by name, MRN, phone..."
+                      value={outstandingSearchQuery}
+                      onChange={(e) => setOutstandingSearchQuery(e.target.value)}
+                      className="pl-9 h-9 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm">
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow className="hover:bg-transparent border-slate-100 text-[10px] uppercase tracking-wider font-extrabold text-slate-500">
+                        <TableHead className="py-3 pl-4">Patient / MRN</TableHead>
+                        <TableHead className="py-3">Contact Info</TableHead>
+                        <TableHead className="py-3 text-right">Gross Billed</TableHead>
+                        <TableHead className="py-3 text-right">Total Settled</TableHead>
+                        <TableHead className="py-3 text-right text-rose-600 font-black">Outstanding Balance</TableHead>
+                        <TableHead className="py-3 text-right pr-4">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activePatientsWithOutstanding.length > 0 ? (
+                        activePatientsWithOutstanding.map((p) => (
+                          <TableRow key={p.id} className="border-slate-50 hover:bg-slate-50/30 transition-colors">
+                            <TableCell className="py-3 pl-4">
+                              <div className="font-bold text-slate-800 text-xs">{p.name}</div>
+                              <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                                {p.mrn || 'N/A'}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3 text-xs text-slate-600">
+                              <div>{p.phone || 'N/A'}</div>
+                              {p.gender && (
+                                <span className="text-[9px] uppercase font-bold text-slate-400 bg-slate-100 px-1 py-0.5 rounded">
+                                  {p.gender} &bull; {p.age}Y
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-3 text-right font-medium text-slate-700 text-xs">
+                              {formatCurrency(p.grossTotal)}
+                            </TableCell>
+                            <TableCell className="py-3 text-right font-medium text-emerald-600 text-xs">
+                              {formatCurrency(p.paidTotal)}
+                            </TableCell>
+                            <TableCell className="py-3 text-right font-black text-rose-600 text-xs">
+                              {formatCurrency(p.outstandingDues)}
+                            </TableCell>
+                            <TableCell className="py-3 text-right pr-4">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-[10px] font-bold border-medical-blue text-medical-blue hover:bg-medical-blue/5 gap-1"
+                                onClick={() => {
+                                  setConPatientId(p.id);
+                                  setConPatientSearch(p.name);
+                                }}
+                              >
+                                View Statement
+                                <ArrowUpRight className="w-3.5 h-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="py-12 text-center text-xs text-muted-foreground">
+                            {outstandingSearchQuery ? "No patients with outstanding balance found matching your search." : "No active patients with outstanding balance found."}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             )}
           </CardContent>
