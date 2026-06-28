@@ -2027,7 +2027,7 @@ export default function OPD() {
                       <TableCell className="font-medium whitespace-nowrap">{patient.name}</TableCell>
                       <TableCell className="whitespace-nowrap">{patient.age}Y / {patient.gender}</TableCell>
                       <TableCell className="whitespace-nowrap">{patient.phone}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">10-Apr-2024</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(patient.created_at || patient.registration_date)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button 

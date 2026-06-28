@@ -990,6 +990,26 @@ export function normalizePatient(p: any) {
   };
 }
 
+export function isDummyPatient(p: any): boolean {
+  if (!p) return false;
+  const name = (p.name || '').trim();
+  const phone = (p.phone || '').trim();
+  const id = String(p.id || '');
+  
+  return (
+    id === 'p1' || 
+    id === 'p2' || 
+    id === 'pat1' || 
+    id === 'pat2' || 
+    id === 'pat3' || 
+    id.startsWith('seed-') ||
+    (name === 'Amit Patel' && phone === '9876543210') ||
+    (name === 'Priya Singh' && phone === '9123456789') ||
+    (name === 'Rahul Sharma' && phone === '9543210987')
+  );
+}
+
+
 export function normalizeBed(b: any) {
   if (!b) return b;
   const num = b.bed_number || b.number || b.id || '';
@@ -1051,10 +1071,10 @@ const rawSupabaseService = {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return (data || []).map(normalizePatient);
+      return (data || []).map(normalizePatient).filter((p: any) => !isDummyPatient(p));
     } catch (error: any) {
       console.warn('Error fetching patients, falling back to local storage:', error.message);
-      return (storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS) || []).map(normalizePatient);
+      return (storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS) || []).map(normalizePatient).filter((p: any) => !isDummyPatient(p));
     }
   },
 
@@ -4142,7 +4162,7 @@ function executeOfflineQuery(key: string, args: any[]): any {
         };
       });
     } else if (key === 'getPatients') {
-      cached = cached.map(normalizePatient);
+      cached = cached.map(normalizePatient).filter((p: any) => !isDummyPatient(p));
     } else if (key === 'getLiveQueue') {
       const patientsList = storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS);
       cached = cached.map((item: any) => {

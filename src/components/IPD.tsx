@@ -4193,7 +4193,13 @@ export default function IPD() {
                     <div className="flex justify-between items-center py-2 border-b border-slate-50">
                       <div>
                         <p className="text-sm font-medium">Occupancy</p>
-                        <p className="text-xs text-muted-foreground">Admitted on 10-Apr-2024</p>
+                        <p className="text-xs text-muted-foreground">
+                          Admitted on {(() => {
+                            const activeAdm = admissions.find(a => a.patient_id === selectedPatient?.id || a.patientId === selectedPatient?.id);
+                            const admDate = activeAdm?.admission_date || activeAdm?.admissionDate || activeAdm?.created_at || selectedPatient?.created_at;
+                            return formatDate(admDate);
+                          })()}
+                        </p>
                       </div>
                       <p className="text-sm font-bold">3 Days</p>
                     </div>
