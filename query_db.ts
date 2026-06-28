@@ -17,9 +17,12 @@ async function run() {
   console.log('Current row:', hData);
   
   console.log('Fetching patients count...');
-  const { data: pData, error: pErr } = await supabase.from('patients').select('*');
+  const { data: pData, error: pErr } = await supabase.from('patients').select('id, name, mrn, phone, registration_type, status, created_at');
   if (pErr) console.error('pErr:', pErr);
-  else console.log('Patients count in DB:', pData?.length);
+  else {
+    console.log('Patients count in DB:', pData?.length);
+    console.log('Patients in DB:', JSON.stringify(pData, null, 2));
+  }
 
   console.log('Fetching invoices count...');
   const { data: iData, error: iErr } = await supabase.from('invoices').select('*');

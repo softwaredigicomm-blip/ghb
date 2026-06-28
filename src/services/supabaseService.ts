@@ -161,6 +161,108 @@ async function ensurePatientExistsInDb(patientId: string): Promise<boolean> {
   }
 }
 
+async function ensureProfileExistsInDb(profileId: string): Promise<string | null> {
+  if (!profileId) return null;
+  try {
+    const cleanId = isUuid(profileId) ? profileId : toDeterministicUuid(profileId);
+    
+    // Check if the profile already exists in the database
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', cleanId)
+      .maybeSingle();
+      
+    if (data && data.id) {
+      return cleanId; // Already exists!
+    }
+    
+    // If not, fetch details from local storage or mock data to insert a record
+    const localUsers = (storage.get(STORAGE_KEYS.USERS, MOCK_USERS) || []) as any[];
+    const userData = localUsers.find((u: any) => 
+      u.id === profileId || 
+      u.id === cleanId || 
+      toDeterministicUuid(u.id) === cleanId
+    ) as any;
+    
+    // Get default role or fallback role
+    let role: string = userData?.role || 'ACCOUNTANT';
+    const r = role.toUpperCase().trim();
+    if (r === 'RECEPTION' || r === 'RECEPTION_STAFF') {
+      role = 'RECEPTIONIST';
+    } else if (r === 'LAB_STAFF' || r === 'LAB_STAFF_MEMBER') {
+      role = 'LAB_TECHNICIAN';
+    } else if (r === 'ACCOUNTS') {
+      role = 'ACCOUNTANT';
+    } else if (!['SUPER_ADMIN', 'ADMIN', 'DOCTOR', 'SURGEON', 'NURSE', 'RECEPTIONIST', 'ACCOUNTANT', 'LAB_TECHNICIAN', 'PHARMACIST'].includes(r)) {
+      role = 'ACCOUNTANT'; // default fallback
+    } else {
+      role = r;
+    }
+
+    const dbProfile = {
+      id: cleanId,
+      name: userData?.name || 'Accounts Manager',
+      email: userData?.email || `${cleanId.slice(0, 8)}@globalhospital.com`,
+      role: role,
+      phone: userData?.phone || '+91 9999999999',
+      department: userData?.department || 'Accounts',
+      designation: userData?.designation || 'Accountant'
+    };
+    
+    // Insert into profiles
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert([dbProfile]);
+      
+    if (insertError) {
+      console.warn('Error inserting profile in ensureProfileExistsInDb:', insertError.message);
+      
+      // Fallback: fetch any existing profile from the database to avoid foreign key violations
+      const { data: existingProfiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .limit(1);
+        
+      if (existingProfiles && existingProfiles.length > 0) {
+        console.log('Falling back to existing profile ID:', existingProfiles[0].id);
+        return existingProfiles[0].id;
+      }
+      return null;
+    }
+    return cleanId;
+  } catch (error: any) {
+    console.error('Error in ensureProfileExistsInDb:', error.message);
+    return null;
+  }
+}
+
+async function ensureForeignKeysExist(payload: any) {
+  if (!payload || typeof payload !== 'object') return;
+  
+  // 1. Ensure Patient exists
+  if (payload.patient_id) {
+    await ensurePatientExistsInDb(payload.patient_id);
+  }
+  
+  // 2. Ensure Profile exists
+  const profileFields = [
+    'doctor_id', 'nurse_id', 'issued_by', 'recorded_by', 'author_id',
+    'surgeon_id', 'anesthetist_id', 'user_id', 'requested_by', 'performed_by',
+    'head_id', 'incoming_nurse_id', 'outgoing_nurse_id'
+  ];
+  
+  for (const field of profileFields) {
+    if (payload[field]) {
+      const actualId = await ensureProfileExistsInDb(payload[field]);
+      if (actualId && actualId !== payload[field]) {
+        console.log(`Mapping payload field ${field} from ${payload[field]} to existing profile ${actualId}`);
+        payload[field] = actualId;
+      }
+    }
+  }
+}
+
 // --- SCHEMA NORMALIZATION HELPERS ---
 function cleanAppointmentForPostgres(apt: any) {
   if (!apt) return apt;
@@ -949,26 +1051,10 @@ const rawSupabaseService = {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      const normalized = (data || []).map(normalizePatient);
-      return normalized.filter((p: any) => 
-        p.id !== 'p1' && 
-        p.id !== 'p2' && 
-        p.name !== 'Amit Patel' && 
-        p.name !== 'Priya Singh' && 
-        p.phone !== '9876543210' && 
-        p.phone !== '9123456789'
-      );
+      return (data || []).map(normalizePatient);
     } catch (error: any) {
       console.warn('Error fetching patients, falling back to local storage:', error.message);
-      const fallback = (storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS) || []).map(normalizePatient);
-      return fallback.filter((p: any) => 
-        p.id !== 'p1' && 
-        p.id !== 'p2' && 
-        p.name !== 'Amit Patel' && 
-        p.name !== 'Priya Singh' && 
-        p.phone !== '9876543210' && 
-        p.phone !== '9123456789'
-      );
+      return (storage.get(STORAGE_KEYS.PATIENTS, MOCK_PATIENTS) || []).map(normalizePatient);
     }
   },
 
@@ -1060,9 +1146,7 @@ const rawSupabaseService = {
   createAppointment: async (appointment: any) => {
     try {
       const dbApt = cleanAppointmentForPostgres(appointment);
-      if (dbApt.patient_id) {
-        await ensurePatientExistsInDb(dbApt.patient_id);
-      }
+      await ensureForeignKeysExist(dbApt);
       const { data, error } = await supabase
         .from('appointments')
         .insert([dbApt])
@@ -1236,9 +1320,11 @@ const rawSupabaseService = {
 
   createPrescription: async (prescription: any) => {
     try {
+      const dbPayload = cleanUuidFields(prescription);
+      await ensureForeignKeysExist(dbPayload);
       const { data, error } = await supabase
         .from('prescriptions')
-        .insert([cleanUuidFields(prescription)])
+        .insert([dbPayload])
         .select();
       
       if (error) throw error;
@@ -1285,9 +1371,7 @@ const rawSupabaseService = {
   createInvoice: async (invoice: any, items: any[]) => {
     try {
       const dbInv = cleanInvoiceForPostgres(invoice);
-      if (dbInv.patient_id) {
-        await ensurePatientExistsInDb(dbInv.patient_id);
-      }
+      await ensureForeignKeysExist(dbInv);
       const { data: invData, error: invError } = await supabase
         .from('invoices')
         .insert([dbInv])
@@ -1327,6 +1411,7 @@ const rawSupabaseService = {
       const dbInv = cleanInvoiceForPostgres(invoice);
       delete dbInv.invoice_items;
       delete dbInv.patients;
+      await ensureForeignKeysExist(dbInv);
 
       const { data: invData, error: invError } = await supabase
         .from('invoices')
@@ -4688,6 +4773,7 @@ export async function syncOfflineDataWithSupabase() {
         }
 
         const dbInvData = cleanInvoiceForPostgres(invData);
+        await ensureForeignKeysExist(dbInvData);
         const { data, error } = await supabase
           .from('invoices')
           .insert([dbInvData])
